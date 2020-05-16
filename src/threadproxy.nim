@@ -1,4 +1,7 @@
-import json, asyncfutures, tables, asyncdispatch, options
+import json, asyncfutures, tables, asyncdispatch
+
+# always use together
+export json, asyncdispatch
 
 type 
   ThreadProxyError* = object of CatchableError
@@ -234,6 +237,9 @@ proc process*(proxy: ThreadProxy): bool =
   let (hasData, event) = proxy.channel[].tryRecv()
   result = hasData
   if not hasData: return
+
+  # for debug
+  # echo proxy.name, event
 
   case event.kind:
   of EMIT:
