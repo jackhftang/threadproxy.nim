@@ -9,7 +9,7 @@ Each thread is associated with one channel. Threads process its channel with asy
 
 Two communication patterns are provided:
 - `send` is uni-directional, sending data to channel of target thread.
-- `ask` is bi-directional, request-and-reply style with returning type `Future[JsoNode]`, use like remote procedure call. 
+- `ask` is bi-directional, request-and-reply style with returning type `Future[JsonNode]`, use like remote procedure call. 
 
 Each thread has a fixed unique `name`. All threads can talk with each other by name. The order of creation of threads does not matter, as long as the target thread is created before calling `send` or `ask`.
 
@@ -59,6 +59,9 @@ proc main() =
 when isMainModule:
   main()
 ```
+
+## Manually Create Thread
+
 
 
 
