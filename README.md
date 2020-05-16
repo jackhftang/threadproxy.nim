@@ -7,10 +7,11 @@ Simplify Nim inter-thread communiccation.
 This library is based on [threads](https://nim-lang.org/docs/threads.html) and [channels](https://nim-lang.org/docs/channels.html). 
 Each thread is associated with one channel. Threads process its channel with asyncdispatcher.
 
-Two communication patterns `send` and `ask` are provided. `send` is uni-directional which primary usage is to notify another thread. 
-`ask` is bi-directional, request-and-reply style which functions like remote function call. 
+Two communication patterns are provided:
+- `send` is uni-directional, sending data to channel of target thread.
+- `ask` is bi-directional, request-and-reply style with returning type `Future[JsoNode]`, use like remote procedure call. 
 
-Each thread has a name. All threads can talk with each other by name reference. 
+Each thread has a fixed unique `name`. All threads can talk with each other by name. The order of creation of threads does not matter, as long as the target thread is created before calling `send` or `ask`.
 
 The only data exchange format is `json`.
 
