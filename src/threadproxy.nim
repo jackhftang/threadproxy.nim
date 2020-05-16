@@ -1,6 +1,6 @@
-import json, asyncfutures, tables, asyncdispatch
+import json, tables, asyncdispatch
 
-# always use together
+# almost always use together
 export json, asyncdispatch
 
 type 
@@ -305,11 +305,15 @@ proc process*(proxy: ThreadProxy): bool =
       raise newException(Defect, "Unknown system action " & event.action)
 
 proc poll*(proxy: ThreadProxy, interval: int = 16): Future[void] {.async.} =
+  # instead of while proxy.proces()
+  # callSoon provide chance for other async job.
+  proc loop() {.gcsafe.} =
+    if proxy.process():
+      callSoon loop
   while true:
     await sleepAsync(interval)
-    while proxy.process():
-      discard
-
+    loop()
+    
 proc createToken*(proxy: MainThreadProxy, name: string): ThreadToken =
   let ch = newThreadChannel()
   proxy.channels[name] = ch
