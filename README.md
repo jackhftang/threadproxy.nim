@@ -25,25 +25,13 @@ proc fib(x: int): int =
   else: fib(x-1) + fib(x-2)
 
 proc workerMain(proxy: ThreadProxy) {.thread.} =
-  echo proxy.name, " is running"
-
   # register action handler
   proxy.onData "fib":
     let x = data.getInt()
-    echo proxy.name, " is finding fib(", x, ")"
-    let y = fib(x)
-    result = %*{
-      "name": proxy.name,
-      "input": x,
-      "output": y
-    }
+    return %fib(x)
 
   # start processing channel
-  asyncCheck proxy.poll()
-
-  # do other async task here
-  
-  runForever()
+  waitFor proxy.poll()
 
 proc main() =
   let proxy = newMainThreadProxy("master")
@@ -51,25 +39,19 @@ proc main() =
 
   # create N threads
   let N = 4
-  for i in 0..<N:
+  for i in 0 ..< N:
     proxy.createThread("worker_" & $i, workerMain)
 
-  # distribute M jobs to threads randomly
+  # distribute M jobs to threads
   let M = 40
   var done = 0
   for x in 1..M:
     capture x:
-      let future = proxy.ask("worker_" & $(x mod N), "fib", %x)
+      let name = "worker_" & $(x mod N)
+      let future = proxy.ask(name, "fib", %x)
       future.addCallback:
-        if future.failed:
-          let err = future.readError()
-          echo err.msg
-        else:
-          let json = future.read
-          let name = json["name"].getStr()
-          let x = json["input"].getInt()
-          let y = json["output"].getInt()
-          echo name, " found fib(", x, ") = ", y
+        let y = future.read
+        echo name, ": fib(", x, ") = ", y
         done += 1
 
   while done < M: poll()
