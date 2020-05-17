@@ -15,11 +15,11 @@ type
     action: string
     sender: string
     data: JsonNode
-  
+  NameConflictError* = object of ThreadProxyError
+    threadName: string
+
   ThreadMessageKind* = enum
-    EMIT, 
-    REQUEST, REPLY,
-    SYS
+    EMIT, REQUEST, REPLY, SYS
 
   SysMsg = enum 
     GET_NAME_REQ, GET_NAME_REP
@@ -27,8 +27,10 @@ type
   ThreadMessage* = object
     kind: ThreadMessageKind
     action: string
-    data: JsonNode
-    sender: ThreadChannelPtr  # or data in SYS_REP
+    json: JsonNode
+    # means sender in REQ/REP
+    # means channel in GET_NAME_REP
+    channel: ThreadChannelPtr  
     callbackId: int
       
   ThreadChannel* = Channel[ThreadMessage]
@@ -38,14 +40,15 @@ type
   ThreadDefaultActionHandler* = proc(action: string, data: JsonNode): Future[JsonNode] {.gcsafe.}
 
   ThreadProxy* = ref object of RootObj
+    active: bool
     name: string
     mainChannel, channel: ThreadChannelPtr
-    callbackSeed: int
-    callbacks: Table[int, Future[JsonNode]]
     actions: Table[string, ThreadActionHandler]
     defaultAction: ThreadDefaultActionHandler
+    callbackSeed: int
+    jsonCallbacks: Table[int, Future[JsonNode]]
+    channelCallbacks: Table[int, Future[ThreadChannelPtr]]
     directory: Table[string, ThreadChannelPtr] # local cache 
-    nameCallbacks: Table[int, Future[ThreadChannelPtr]]
 
   ThreadChannelWrapper = ref object
     # manually manage memory to prevent GC
@@ -90,8 +93,8 @@ proc newThreadProxy*(token: ThreadToken): ThreadProxy =
     name: token.name,
     mainChannel: token.mainChannel,
     channel: token.channel,
-    callbackSeed: 1, # avoid the use of 0
-    callbacks: initTable[int, Future[JsonNode]](),
+    callbackSeed: 0, 
+    jsonCallbacks: initTable[int, Future[JsonNode]](),
     actions: initTable[string, ThreadActionHandler](),
     defaultAction: defaultAction
   )
@@ -104,8 +107,8 @@ proc newMainThreadProxy*(name: string): MainThreadProxy =
     name: name,
     mainChannel: ch.self,
     channel: ch.self,
-    callbackSeed: 1,
-    callbacks: initTable[int, Future[JsonNode]](),
+    callbackSeed: 0,
+    jsonCallbacks: initTable[int, Future[JsonNode]](),
     actions: initTable[string, ThreadActionHandler](),
     defaultAction: defaultAction,
     channels: channels
@@ -120,9 +123,9 @@ proc newMessage*(
 ): ThreadMessage =
   ThreadMessage(
     kind: kind,
-    sender: proxy.channel,
+    channel: proxy.channel,
     action: action,
-    data: if data.isNil: newJNull() else: data,
+    json: if data.isNil: newJNull() else: data,
     callbackId: callbackId
   ) 
 
@@ -135,16 +138,26 @@ proc newSysMessage*(
   ThreadMessage(
     kind: SYS,
     action: action,
-    sender: channel,
-    data: if data.isNil: newJNull() else: data,
+    channel: channel,
+    json: if data.isNil: newJNull() else: data,
     callbackId: callbackId
   ) 
 
 proc name*(proxy: ThreadProxy): string {.inline.} = proxy.name
 
-proc isMainThreadProxy(proxy: ThreadProxy): bool = proxy.channel == proxy.mainChannel
+proc isNameAvailable*(proxy: MainThreadProxy, name: string): bool {.inline.} = name notin proxy.channels
+
+proc isMainThreadProxy(proxy: ThreadProxy): bool {.inline.} = proxy.channel == proxy.mainChannel
+
+proc isRunning*(proxy: ThreadProxy): bool {.inline.} = proxy.active
+
+proc nextCallbackId(proxy: ThreadProxy): int {.inline.} = 
+  # start with 1, callbackId = 0 means no callbacks
+  proxy.callbackSeed += 1
+  result = proxy.callbackSeed
 
 proc on*(proxy: ThreadProxy, action: string, handler: ThreadActionHandler) =
+  ## Set `handler` for `action`
   if action in proxy.actions:
     var err = newException(ActionConflictError, "Action " & action & " has already defined")
     err.action = action 
@@ -152,6 +165,7 @@ proc on*(proxy: ThreadProxy, action: string, handler: ThreadActionHandler) =
   proxy.actions[action] = handler
 
 proc onDefault*(proxy: ThreadProxy, handler: ThreadDefaultActionHandler) =
+  ## Set default `handler`
   proxy.defaultAction = handler
 
 template onData*(proxy: ThreadProxy, action: string, body: untyped): void =    
@@ -182,13 +196,12 @@ proc send*(proxy: ThreadProxy, target: ThreadChannelPtr, action: string, data: J
     result.fail(err)
 
 proc ask*(proxy: ThreadProxy, target: ThreadChannelPtr, action: string, data: JsonNode = nil): Future[JsonNode] =
-  let id = proxy.callbackSeed 
-  proxy.callbackSeed += 1
+  let id = proxy.nextCallbackId() 
   result = newFuture[JsonNode]("ask")
-  proxy.callbacks[id] = result
+  proxy.jsonCallbacks[id] = result
   let sent = target[].trySend proxy.newMessage(REQUEST, action, data, id)
   if not sent:
-    proxy.callbacks.del(id)
+    proxy.jsonCallbacks.del(id)
     let err = newException(MessageUndeliveredError, "failed to send")
     err.action = action
     err.kind = EMIT
@@ -197,6 +210,8 @@ proc ask*(proxy: ThreadProxy, target: ThreadChannelPtr, action: string, data: Js
     result.fail(err)
 
 proc getChannel*(proxy: ThreadProxy, name: string): Future[ThreadChannelPtr] =
+  ## Resolve name to channel
+  
   if proxy.isMainThreadProxy:
     let mainProxy = cast[MainThreadProxy](proxy)
     let ch = mainProxy.channels.getOrDefault(name, nil)
@@ -217,23 +232,25 @@ proc getChannel*(proxy: ThreadProxy, name: string): Future[ThreadChannelPtr] =
       result.complete(ch)
     else:
       # ask mainThreadProxy for channel pointer
-      let id = proxy.callbackSeed 
-      proxy.callbackSeed += 1
+      let id = proxy.nextCallbackId()
       result = newFuture[ThreadChannelPtr]("getChannel")
-      proxy.nameCallbacks[id] = result
+      proxy.channelCallbacks[id] = result
       proxy.mainChannel[].send newSysMessage($GET_NAME_REQ, proxy.channel, %name, id)
   
 
 proc send*(proxy: ThreadProxy, target: string, action: string, data: JsonNode): Future[void] {.async.} =
+  ## put one message to `target`'s channel
   let ch = await proxy.getChannel(target)
   await proxy.send(ch, action, data)
 
-proc ask*(proxy: ThreadProxy, target: string, action: string, data: JsonNode = nil): Future[JsonNode] {.async.}=
+proc ask*(proxy: ThreadProxy, target: string, action: string, data: JsonNode = nil): Future[JsonNode] {.async.} =
+  ## put one message to target's channel and complete until `target`'s response
   let ch = await proxy.getChannel(target)
   result = await proxy.ask(ch, action, data)
 
 proc process*(proxy: ThreadProxy): bool =
-  ## Process one message on channel
+  ## Process one message on channel. Return false if channel is empty, otherwise true.
+  
   let (hasData, event) = proxy.channel[].tryRecv()
   result = hasData
   if not hasData: return
@@ -244,53 +261,56 @@ proc process*(proxy: ThreadProxy): bool =
   case event.kind:
   of EMIT:
     let action = event.action
+    let data = event.json
     if action in proxy.actions:
       let cb = proxy.actions[action]
-      asyncCheck cb(event.data)
+      asyncCheck cb(data)
     elif not proxy.defaultAction.isNil:
-      asyncCheck proxy.defaultAction(action, event.data)
+      asyncCheck proxy.defaultAction(action, data)
   of REPLY:
     let id = event.callbackId
-    let future = proxy.callbacks.getOrDefault(id, nil)
+    let future = proxy.jsonCallbacks.getOrDefault(id, nil)
     if not future.isNil:
-      proxy.callbacks.del id
-      future.complete(event.data)
+      proxy.jsonCallbacks.del id
+      future.complete(event.json)
     # else already called 
   of REQUEST:
     let action = event.action
-    let target = event.sender
+    let target = event.channel
+    let data = event.json
     let id = event.callbackId
     if action in proxy.actions:
       let cb = proxy.actions[action]  
-      let future = cb(event.data)
+      let future = cb(data)
       future.addCallback proc(f: Future[JsonNode]) =
         target[].send proxy.newMessage(REPLY, action, f.read, id) 
     elif not proxy.defaultAction.isNil:
-      let future = proxy.defaultAction(action, event.data)
+      let future = proxy.defaultAction(action, data)
       future.addCallback proc(f: Future[JsonNode]) =
         target[].send proxy.newMessage(REPLY, action, f.read, id)
   of SYS:
     case event.action
     of $GET_NAME_REQ:
-      let name = event.data.getStr()
+      let name = event.json.getStr()
+      let sender = event.channel
       # only MainThreadProxy should receive name_req
       let mainProxy = cast[MainThreadProxy](proxy)
       let ch = mainProxy.channels.getOrDefault(name, nil)
       if ch.isNil:
         # cannot find name, send back with sender channel pointer
-        event.sender[].send newSysMessage($GET_NAME_REP, event.sender, %name, event.callbackId)
+        sender[].send newSysMessage($GET_NAME_REP, sender, %name, event.callbackId)
       else:
         # found and reply
-        event.sender[].send newSysMessage($GET_NAME_REP, ch.self, %name, event.callbackId)
+        sender[].send newSysMessage($GET_NAME_REP, ch.self, %name, event.callbackId)
     of $GET_NAME_REP:
-      let name = event.data.getStr()
-      let ch = event.sender
+      let name = event.json.getStr()
+      let ch = event.channel
       let id = event.callbackId
-      let cb = proxy.nameCallbacks.getOrDefault(id, nil)
+      let cb = proxy.channelCallbacks.getOrDefault(id, nil)
       if ch == proxy.channel:
         # not found
         if not cb.isNil: 
-          proxy.nameCallbacks.del id
+          proxy.channelCallbacks.del id
           var err = newException(TargetNotFoundError, "Cannot find " & name)
           err.sender = proxy.name
           err.target = name 
@@ -299,22 +319,36 @@ proc process*(proxy: ThreadProxy): bool =
         # found
         proxy.directory[name] = ch
         if not cb.isNil: 
-          proxy.nameCallbacks.del id
+          proxy.channelCallbacks.del id
           cb.complete(ch)
     else:
       raise newException(Defect, "Unknown system action " & event.action)
 
+proc stop*(proxy: ThreadProxy) {.inline.} = proxy.active = false
+
 proc poll*(proxy: ThreadProxy, interval: int = 16): Future[void] {.async.} =
-  # instead of while proxy.proces()
-  # callSoon provide chance for other async job.
   proc loop() {.gcsafe.} =
-    if proxy.process():
-      callSoon loop
-  while true:
-    await sleepAsync(interval)
-    loop()
-    
+    if proxy.active:
+      if proxy.process():
+        # callSonn allow other async task to run
+        callSoon loop
+      else:
+        sleepAsync(interval).addCallback(loop)
+        # addTimer(interval, true, proc(fd: AsyncFD): bool = loop())
+
+  proxy.active = true
+  loop()
+
 proc createToken*(proxy: MainThreadProxy, name: string): ThreadToken =
+  ## Create token for new threadproxy
+  
+  # Check name availability
+  if not proxy.isNameAvailable(name):
+    var err = newException(NameConflictError, "Name " & name & " has already used")
+    err.threadName = name
+    raise err
+
+  # check new channel
   let ch = newThreadChannel()
   proxy.channels[name] = ch
   return ThreadToken(
@@ -324,8 +358,15 @@ proc createToken*(proxy: MainThreadProxy, name: string): ThreadToken =
   )
 
 proc createThread*(proxy: MainThreadProxy, name: string, main: ThreadMainProc) =
+  ## Create new thread managed by `proxy` with an unique `name`
+  
+  # createToken will check name availability
+  let token = proxy.createToken(name)
+
+  # create thread wrapper to prevent GC
   let thread = newThread()
   proxy.threads[name] = thread
-  let token = proxy.createToken(name)
-  let proxy = newThreadProxy(token)
-  createThread(thread.self[], main, proxy)
+
+  # run new thread
+  let proxyToDeepCopy = newThreadProxy(token)
+  createThread(thread.self[], main, proxyToDeepCopy)

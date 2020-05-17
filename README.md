@@ -15,7 +15,51 @@ Each thread has a fixed unique `name`. All threads can talk with each other by n
 
 The only data exchange format is `json`.
 
-## Example 
+## Usage 
+
+The general pattern should look like the following.
+
+```nim
+import threadproxy
+
+proc fooMain(proxy: ThreadProxy) {.thread.} =
+  # setup and poll threadProxy
+  proxy.onData "action1": result = action1(data)
+  proxy.onData "action2": result = action2(data)
+  # ... 
+  asyncCheck proxy.poll()
+
+  # ... 
+  # do something here
+  # ... 
+  
+  runForever()
+
+proc main() =
+  # create, setup and poll mainThreadProxy
+  let proxy = newMainThreadProxy("main")
+  proxy.onData "action1": result = action1(data)
+  proxy.onData "action2": result = action2(data)
+  # ...
+  asyncCheck proxy.poll()
+
+  proxy.createThread("foo1", fooMain)
+  proxy.createThread("foo2", fooMain)
+  #... 
+
+  # ...
+  # do something here
+  # ...
+
+  runForever()
+
+when isMainModeul:
+  main()
+```
+
+## Examples
+
+**Example 1:** Distribute M jobs to N workers.
 
 ```nim
 import threadproxy, sugar
@@ -48,8 +92,8 @@ proc main() =
   for x in 1..M:
     capture x:
       let name = "worker_" & $(x mod N)
-      let future = proxy.ask(name, "fib", %x)
-      future.addCallback:
+      proxy.ask(name, "fib", %x).addCallback:
+        # for demo, ignore future.failed here
         let y = future.read
         echo name, ": fib(", x, ") = ", y
         done += 1
@@ -63,5 +107,8 @@ when isMainModule:
 ## Manually Create Thread
 
 
+## API 
+
+see [here](https://jackhftang.github.io/threadproxy.nim/)
 
 
