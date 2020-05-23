@@ -11,7 +11,7 @@ Simplify Nim Inter-Thread Communication
 - Threads can talk with each other with `name` reference. 
 - Threads can talk with each other in uni-directional with `send`.
 - Threads can talk with each other in two-directional way with `ask`.
-- The order of creation of threads does not matter, as long as the opposite thread is running at the time of calling `send` or `ask`.
+- The order of creation of threads does not matter as long as the target thread is running at the time of calling `send` or `ask`.
 
 ## Usage 
 
@@ -21,7 +21,7 @@ The general pattern should look like the following.
 import threadproxy
 
 proc fooMain(proxy: ThreadProxy) {.thread.} =
-  # setup and poll threadProxy
+  # setup and then poll threadProxy
   proxy.onData "action1": result = action1(data)
   proxy.onData "action2": result = action2(data)
   # ... 
@@ -34,7 +34,7 @@ proc fooMain(proxy: ThreadProxy) {.thread.} =
   runForever()
 
 proc main() =
-  # create, setup and poll mainThreadProxy
+  # create, setup and then poll mainThreadProxy
   let proxy = newMainThreadProxy("main")
   proxy.onData "action1": result = action1(data)
   proxy.onData "action2": result = action2(data)
@@ -47,7 +47,7 @@ proc main() =
   #... 
 
   # ...
-  # do other things here
+  # do something here
   # ...
 
   runForever()
@@ -58,7 +58,7 @@ when isMainModeul:
 
 ## Examples
 
-**Example 1:** simple `ask`
+Example 1: simple ask
 
 ```nim
 import threadproxy, asyncdispatch
@@ -87,17 +87,89 @@ when isMainModule:
   main()
 ```
 
-**Example 2:** N workers pull M jobs
+Example 2: pulling M jobs from N workers and collect result in collector
 
 ```nim
+import threadproxy, deques
 
+const M = 40
+
+proc fib(x: int): int = 
+  if x <= 1: 1 
+  else: fib(x-1) + fib(x-2)
+
+proc collectorMain(proxy: ThreadProxy) {.thread.} =
+  var done = 0
+  proxy.onData "result":
+    let name = data["name"].getStr()
+    let x = data["x"].getInt()
+    let y = data["y"].getInt()
+    echo "collector receive job ", x, " result from ", name, " fib(", x, ") = ", y
+    done += 1
+    if done >= M:
+      # all done
+      asyncCheck proxy.send("master", "stop")
+  waitFor proxy.poll()
+
+proc workerMain(proxy: ThreadProxy) {.thread.} =
+  # start processing channel
+  asyncCheck proxy.poll()
+
+  proc process() {.async.} =
+    let job = await proxy.ask("master", "job")
+    if job.kind == JNull: 
+      # no more job
+      proxy.stop()
+    else:
+      # process job
+      let x = job.getInt()
+      echo proxy.name, " is finding fib(", x, ")"
+      await proxy.send("collector", "result", %*{
+        "name": proxy.name,
+        "x": x,
+        "y": fib(x)
+      })
+
+  while proxy.isRunning:
+    waitFor process()
+
+proc main() =
+  # prepare jobs
+  var jobs = initDeque[int]()
+  for i in 1..M: jobs.addLast i
+
+  # create and setup MainThreadProxy
+  let proxy = newMainThreadProxy("master")
+
+  proxy.onData "stop": proxy.stop()
+  
+  proxy.onData "job":
+    if jobs.len > 0:
+      result = %jobs.popFirst
+    else:
+      # return null if no more job
+      result = newJNull()
+
+  # create collector thread
+  proxy.createThread("collector", collectorMain)
+  
+  # create N threads
+  let N = 4
+  for i in 0 ..< N:
+    proxy.createThread("worker_" & $i, workerMain)
+
+  # poll until proxy stop
+  waitFor proxy.poll()
+
+when isMainModule:
+  main()
 ```
 
 see **/examples** for more examples
 
 ## Manually Create Thread
 
-If you want to pass something into the starting procedure of threads, you need to call `createToken` in main thread and then `createProxy` in the child threads.
+If you want to pass more things into the main procedure of threads, you need to generate a token by calling `createToken` in mainThreadProyx and then pass the token to the main procedure and then call `createProxy` in that threads.
 
 Example
 

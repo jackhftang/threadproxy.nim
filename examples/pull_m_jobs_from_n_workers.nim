@@ -1,4 +1,4 @@
-import threadproxy, sugar
+import threadproxy, deques
 
 const M = 40
 
@@ -15,6 +15,7 @@ proc collectorMain(proxy: ThreadProxy) {.thread.} =
     echo "collector receive job ", x, " result from ", name, " fib(", x, ") = ", y
     done += 1
     if done >= M:
+      # all done
       asyncCheck proxy.send("master", "stop")
   waitFor proxy.poll()
 
@@ -28,8 +29,9 @@ proc workerMain(proxy: ThreadProxy) {.thread.} =
       # no more job
       proxy.stop()
     else:
+      # process job
       let x = job.getInt()
-      echo proxy.name, " is processing ", x
+      echo proxy.name, " is finding fib(", x, ")"
       await proxy.send("collector", "result", %*{
         "name": proxy.name,
         "x": x,
@@ -40,19 +42,21 @@ proc workerMain(proxy: ThreadProxy) {.thread.} =
     waitFor process()
 
 proc main() =
-  let proxy = newMainThreadProxy("master")
-  proxy.onData "stop":
-    proxy.stop()
-  
-  # on job request
-  var job = 1 
-  proxy.onData "job":
-    if job <= M:
-      result = %job
-      job.inc
-    else:
-      result = newJNull()
+  # prepare jobs
+  var jobs = initDeque[int]()
+  for i in 1..M: jobs.addLast i
 
+  # create and setup MainThreadProxy
+  let proxy = newMainThreadProxy("master")
+
+  proxy.onData "stop": proxy.stop()
+  
+  proxy.onData "job":
+    if jobs.len > 0:
+      result = %jobs.popFirst
+    else:
+      # return null if no more job
+      result = newJNull()
 
   # create collector thread
   proxy.createThread("collector", collectorMain)
