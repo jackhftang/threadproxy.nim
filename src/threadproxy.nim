@@ -5,17 +5,30 @@ export json, asyncdispatch
 
 type 
   ThreadProxyError* = object of CatchableError
-  TargetNotFoundError* = object of ThreadProxyError
+
+  ThreadNotFoundError* = object of ThreadProxyError
+    ## Raised when thread with name cannot be found
+    threadName: string
+
+  ReceiverNotFoundError* = object of ThreadProxyError
+    ## raised whenever thread with name not found
     sender: string
-    target: string
-  ActionConflictError* = object of ThreadProxyError
-    action: string
+    receiver: string
+
   MessageUndeliveredError* = object of ThreadProxyError
+    ## raised when message cannot be send to channel
     kind: ThreadMessageKind
     action: string
     sender: string
     data: JsonNode
+
+  ActionConflictError* = object of ThreadProxyError
+    ## raised when registering action with non-unique name
+    threadName: string
+    action: string
+
   NameConflictError* = object of ThreadProxyError
+    ## raise when creating thread with non-unique name
     threadName: string
 
   ThreadMessageKind* = enum
@@ -160,6 +173,7 @@ proc on*(proxy: ThreadProxy, action: string, handler: ThreadActionHandler) =
   ## Set `handler` for `action`
   if action in proxy.actions:
     var err = newException(ActionConflictError, "Action " & action & " has already defined")
+    err.threadName = proxy.name
     err.action = action 
     raise err
   proxy.actions[action] = handler
@@ -219,9 +233,9 @@ proc getChannel*(proxy: ThreadProxy, name: string): Future[ThreadChannelPtr] =
       result = newFuture[ThreadChannelPtr]("getChannel")
       result.complete(ch.self)
     else:
-      var err = newException(TargetNotFoundError, "Cannot not find " & name)
+      var err = newException(ReceiverNotFoundError, "Cannot not find " & name)
       err.sender = proxy.name
-      err.target = name
+      err.receiver = name
       result = newFuture[ThreadChannelPtr]("getChannel")
       result.fail(err)
   else:
@@ -311,9 +325,9 @@ proc process*(proxy: ThreadProxy): bool =
         # not found
         if not cb.isNil: 
           proxy.channelCallbacks.del id
-          var err = newException(TargetNotFoundError, "Cannot find " & name)
+          var err = newException(ReceiverNotFoundError, "Cannot find " & name)
           err.sender = proxy.name
-          err.target = name 
+          err.receiver = name 
           cb.fail(err)
       else: 
         # found
@@ -376,3 +390,21 @@ proc createThread*(proxy: MainThreadProxy, name: string, main: ThreadMainProc) =
   # run new thread
   let proxyToDeepCopy = newThreadProxy(token)
   createThread(thread.self[], main, proxyToDeepCopy)
+
+proc pinToCpu*(proxy: MainThreadProxy, name: string, cpu: Natural) =
+  ## Pin thread `name` to cpu. Raise ThreadNotFoundError if name not found.
+  if name in proxy.threads:
+    let err = newException(ThreadNotFoundError, "Cannot find thread with name " & name)
+    err.threadName = name
+    raise err
+  let thread = proxy.threads[name]
+  pinToCpu(thread.self[], cpu)
+  
+proc isThreadRunning*(proxy: MainThreadProxy, name: string): bool =
+  ## Check whether thread is running. Applicable only to threads created with `createThread`
+  if name in proxy.threads:
+    let err = newException(ThreadNotFoundError, "Cannot find thread with name " & name)
+    err.threadName = name
+    raise err
+  let thread = proxy.threads[name]
+  result = running(thread.self[])
