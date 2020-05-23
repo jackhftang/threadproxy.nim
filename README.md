@@ -5,8 +5,8 @@ Simplify Nim Inter-Thread Communication
 ## Overview 
 
 - Each thread has a fixed unique `name`.
-- Each thread is associated with one [`Channel`](https://nim-lang.org/docs/channels.html). 
-- Each thread processes its channel with `poll`.
+- Each thread is associated with one [`Channel`](https://nim-lang.org/docs/channels.html#Channel). 
+- Each thread processes its channel with `threadproxy.poll`.
 - JSON is the data exchange format.
 - Threads can talk with each other with `name` reference. 
 - Threads can talk with each other in uni-directional with `send`.
@@ -173,7 +173,7 @@ If you want to pass more things into the main procedure of threads, you need to 
 
 Example
 
-```
+```nim
 import threadproxy, asyncdispatch
 
 type
