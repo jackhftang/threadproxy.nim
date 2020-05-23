@@ -2,7 +2,7 @@
 
 version       = "0.0.2"
 author        = "Jack Tang"
-description   = "Simplify Nim inter-thread Communication"
+description   = "Simplify Nim Inter-Thread Communication"
 license       = "MIT"
 srcDir        = "src"
 

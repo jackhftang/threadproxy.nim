@@ -238,7 +238,7 @@ proc getChannel*(proxy: ThreadProxy, name: string): Future[ThreadChannelPtr] =
       proxy.mainChannel[].send newSysMessage($GET_NAME_REQ, proxy.channel, %name, id)
   
 
-proc send*(proxy: ThreadProxy, target: string, action: string, data: JsonNode): Future[void] {.async.} =
+proc send*(proxy: ThreadProxy, target: string, action: string, data: JsonNode = nil): Future[void] {.async.} =
   ## put one message to `target`'s channel
   let ch = await proxy.getChannel(target)
   await proxy.send(ch, action, data)
@@ -323,18 +323,24 @@ proc process*(proxy: ThreadProxy): bool =
           cb.complete(ch)
     else:
       raise newException(Defect, "Unknown system action " & event.action)
-
+  
 proc stop*(proxy: ThreadProxy) {.inline.} = proxy.active = false
 
-proc poll*(proxy: ThreadProxy, interval: int = 16): Future[void] {.async.} =
+proc poll*(proxy: ThreadProxy, interval: int = 16): Future[void] =
+  var future = newFuture[void]("poll")
+  result = future
+
   proc loop() {.gcsafe.} =
     if proxy.active:
       if proxy.process():
         # callSonn allow other async task to run
-        callSoon loop
+        if proxy.active: callSoon loop
+        else: future.complete()
       else:
         sleepAsync(interval).addCallback(loop)
         # addTimer(interval, true, proc(fd: AsyncFD): bool = loop())
+    else:
+      future.complete()
 
   proxy.active = true
   loop()
