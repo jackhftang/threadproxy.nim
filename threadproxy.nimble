@@ -1,6 +1,6 @@
 # Package
 
-version       = "0.0.2"
+version       = "0.1.0"
 author        = "Jack Tang"
 description   = "Simplify Nim Inter-Thread Communication"
 license       = "MIT"

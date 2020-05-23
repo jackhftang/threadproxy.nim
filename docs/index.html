@@ -193,7 +193,8 @@ function main() {
   <li><a class="reference" href="#getChannel%2CThreadProxy%2Cstring"
     title="getChannel(proxy: ThreadProxy; name: string): Future[ThreadChannelPtr]"><wbr />get<wbr />Channel<span class="attachedType">ThreadProxy</span></a></li>
   <li><a class="reference" href="#send%2CThreadProxy%2Cstring%2Cstring%2CJsonNode"
-    title="send(proxy: ThreadProxy; target: string; action: string; data: JsonNode): Future[void]"><wbr />send<span class="attachedType">ThreadProxy</span></a></li>
+    title="send(proxy: ThreadProxy; target: string; action: string; data: JsonNode = nil): Future[
+    void]"><wbr />send<span class="attachedType">ThreadProxy</span></a></li>
   <li><a class="reference" href="#ask%2CThreadProxy%2Cstring%2Cstring%2CJsonNode"
     title="ask(proxy: ThreadProxy; target: string; action: string; data: JsonNode = nil): Future[
     JsonNode]"><wbr />ask<span class="attachedType">ThreadProxy</span></a></li>
@@ -472,7 +473,7 @@ Resolve name to channel
 
 </dd>
 <a id="send,ThreadProxy,string,string,JsonNode"></a>
-<dt><pre><span class="Keyword">proc</span> <a href="#send%2CThreadProxy%2Cstring%2Cstring%2CJsonNode"><span class="Identifier">send</span></a><span class="Other">(</span><span class="Identifier">proxy</span><span class="Other">:</span> <a href="threadproxy.html#ThreadProxy"><span class="Identifier">ThreadProxy</span></a><span class="Other">;</span> <span class="Identifier">target</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">action</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">data</span><span class="Other">:</span> <span class="Identifier">JsonNode</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">Future</span><span class="Other">[</span>
+<dt><pre><span class="Keyword">proc</span> <a href="#send%2CThreadProxy%2Cstring%2Cstring%2CJsonNode"><span class="Identifier">send</span></a><span class="Other">(</span><span class="Identifier">proxy</span><span class="Other">:</span> <a href="threadproxy.html#ThreadProxy"><span class="Identifier">ThreadProxy</span></a><span class="Other">;</span> <span class="Identifier">target</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">action</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">data</span><span class="Other">:</span> <span class="Identifier">JsonNode</span> <span class="Other">=</span> <span class="Keyword">nil</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">Future</span><span class="Other">[</span>
     <span class="Identifier">void</span><span class="Other">]</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">FutureError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
@@ -503,8 +504,9 @@ Process one message on channel. Return false if channel is empty, otherwise true
 
 </dd>
 <a id="poll,ThreadProxy,int"></a>
-<dt><pre><span class="Keyword">proc</span> <a href="#poll%2CThreadProxy%2Cint"><span class="Identifier">poll</span></a><span class="Other">(</span><span class="Identifier">proxy</span><span class="Other">:</span> <a href="threadproxy.html#ThreadProxy"><span class="Identifier">ThreadProxy</span></a><span class="Other">;</span> <span class="Identifier">interval</span><span class="Other">:</span> <span class="Identifier">int</span> <span class="Other">=</span> <span class="DecNumber">16</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">Future</span><span class="Other">[</span><span class="Identifier">void</span><span class="Other">]</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma">
-    <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">FutureError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">,</span> <span class="Identifier">TimeEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+<dt><pre><span class="Keyword">proc</span> <a href="#poll%2CThreadProxy%2Cint"><span class="Identifier">poll</span></a><span class="Other">(</span><span class="Identifier">proxy</span><span class="Other">:</span> <a href="threadproxy.html#ThreadProxy"><span class="Identifier">ThreadProxy</span></a><span class="Other">;</span> <span class="Identifier">interval</span><span class="Other">:</span> <span class="Identifier">int</span> <span class="Other">=</span> <span class="DecNumber">16</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">Future</span><span class="Other">[</span><span class="Identifier">void</span><span class="Other">]</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ValueError</span><span class="Other">,</span>
+    <span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">FutureError</span><span class="Other">,</span> <span class="Identifier">DeadThreadError</span><span class="Other">,</span> <span class="Identifier">Defect</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">,</span> <span class="Identifier">TimeEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
 
@@ -556,7 +558,7 @@ Create new thread managed by <tt class="docutils literal"><span class="pre">prox
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br/>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2020-05-17 02:31:56 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2020-05-23 10:34:47 UTC</small>
       </div>
     </div>
   </div>
