@@ -102,19 +102,23 @@ function main() {
   <ul class="simple simple-toc-section">
       <li><a class="reference" href="#ThreadProxyError"
     title="ThreadProxyError = object of CatchableError"><wbr />Thread<wbr />Proxy<wbr />Error<span class="attachedType"></span></a></li>
-  <li><a class="reference" href="#TargetNotFoundError"
-    title="TargetNotFoundError = object of ThreadProxyError
+  <li><a class="reference" href="#ThreadNotFoundError"
+    title="ThreadNotFoundError = object of ThreadProxyError
+  threadName: string"><wbr />Thread<wbr />Not<wbr />Found<wbr />Error<span class="attachedType"></span></a></li>
+  <li><a class="reference" href="#ReceiverNotFoundError"
+    title="ReceiverNotFoundError = object of ThreadProxyError
   sender: string
-  target: string"><wbr />Target<wbr />Not<wbr />Found<wbr />Error<span class="attachedType"></span></a></li>
-  <li><a class="reference" href="#ActionConflictError"
-    title="ActionConflictError = object of ThreadProxyError
-  action: string"><wbr />Action<wbr />Conflict<wbr />Error<span class="attachedType"></span></a></li>
+  receiver: string"><wbr />Receiver<wbr />Not<wbr />Found<wbr />Error<span class="attachedType"></span></a></li>
   <li><a class="reference" href="#MessageUndeliveredError"
     title="MessageUndeliveredError = object of ThreadProxyError
   kind: ThreadMessageKind
   action: string
   sender: string
   data: JsonNode"><wbr />Message<wbr />Undelivered<wbr />Error<span class="attachedType"></span></a></li>
+  <li><a class="reference" href="#ActionConflictError"
+    title="ActionConflictError = object of ThreadProxyError
+  threadName: string
+  action: string"><wbr />Action<wbr />Conflict<wbr />Error<span class="attachedType"></span></a></li>
   <li><a class="reference" href="#NameConflictError"
     title="NameConflictError = object of ThreadProxyError
   threadName: string"><wbr />Name<wbr />Conflict<wbr />Error<span class="attachedType"></span></a></li>
@@ -208,6 +212,10 @@ function main() {
     title="createToken(proxy: MainThreadProxy; name: string): ThreadToken"><wbr />create<wbr />Token<span class="attachedType">MainThreadProxy</span></a></li>
   <li><a class="reference" href="#createThread%2CMainThreadProxy%2Cstring%2CThreadMainProc"
     title="createThread(proxy: MainThreadProxy; name: string; main: ThreadMainProc)"><wbr />create<wbr />Thread<span class="attachedType">MainThreadProxy</span></a></li>
+  <li><a class="reference" href="#pinToCpu%2CMainThreadProxy%2Cstring%2CNatural"
+    title="pinToCpu(proxy: MainThreadProxy; name: string; cpu: Natural)"><wbr />pin<wbr />To<wbr />Cpu<span class="attachedType">MainThreadProxy</span></a></li>
+  <li><a class="reference" href="#isThreadRunning%2CMainThreadProxy%2Cstring"
+    title="isThreadRunning(proxy: MainThreadProxy; name: string): bool"><wbr />is<wbr />Thread<wbr />Running<span class="attachedType">MainThreadProxy</span></a></li>
 
   </ul>
 </li>
@@ -239,23 +247,23 @@ function main() {
 
 
 </dd>
-<a id="TargetNotFoundError"></a>
-<dt><pre><a href="threadproxy.html#TargetNotFoundError"><span class="Identifier">TargetNotFoundError</span></a> <span class="Other">=</span> <span class="Keyword">object</span> <span class="Keyword">of</span> <a href="threadproxy.html#ThreadProxyError"><span class="Identifier">ThreadProxyError</span></a>
-  <span class="Identifier">sender</span><span class="Other">:</span> <span class="Identifier">string</span>
-  <span class="Identifier">target</span><span class="Other">:</span> <span class="Identifier">string</span>
+<a id="ThreadNotFoundError"></a>
+<dt><pre><a href="threadproxy.html#ThreadNotFoundError"><span class="Identifier">ThreadNotFoundError</span></a> <span class="Other">=</span> <span class="Keyword">object</span> <span class="Keyword">of</span> <a href="threadproxy.html#ThreadProxyError"><span class="Identifier">ThreadProxyError</span></a>
+  <span class="Identifier">threadName</span><span class="Other">:</span> <span class="Identifier">string</span>
 </pre></dt>
 <dd>
 
-
+Raised when thread with name cannot be found
 
 </dd>
-<a id="ActionConflictError"></a>
-<dt><pre><a href="threadproxy.html#ActionConflictError"><span class="Identifier">ActionConflictError</span></a> <span class="Other">=</span> <span class="Keyword">object</span> <span class="Keyword">of</span> <a href="threadproxy.html#ThreadProxyError"><span class="Identifier">ThreadProxyError</span></a>
-  <span class="Identifier">action</span><span class="Other">:</span> <span class="Identifier">string</span>
+<a id="ReceiverNotFoundError"></a>
+<dt><pre><a href="threadproxy.html#ReceiverNotFoundError"><span class="Identifier">ReceiverNotFoundError</span></a> <span class="Other">=</span> <span class="Keyword">object</span> <span class="Keyword">of</span> <a href="threadproxy.html#ThreadProxyError"><span class="Identifier">ThreadProxyError</span></a>
+  <span class="Identifier">sender</span><span class="Other">:</span> <span class="Identifier">string</span>
+  <span class="Identifier">receiver</span><span class="Other">:</span> <span class="Identifier">string</span>
 </pre></dt>
 <dd>
 
-
+raised whenever thread with name not found
 
 </dd>
 <a id="MessageUndeliveredError"></a>
@@ -267,7 +275,17 @@ function main() {
 </pre></dt>
 <dd>
 
+raised when message cannot be send to channel
 
+</dd>
+<a id="ActionConflictError"></a>
+<dt><pre><a href="threadproxy.html#ActionConflictError"><span class="Identifier">ActionConflictError</span></a> <span class="Other">=</span> <span class="Keyword">object</span> <span class="Keyword">of</span> <a href="threadproxy.html#ThreadProxyError"><span class="Identifier">ThreadProxyError</span></a>
+  <span class="Identifier">threadName</span><span class="Other">:</span> <span class="Identifier">string</span>
+  <span class="Identifier">action</span><span class="Other">:</span> <span class="Identifier">string</span>
+</pre></dt>
+<dd>
+
+raised when registering action with non-unique name
 
 </dd>
 <a id="NameConflictError"></a>
@@ -276,7 +294,7 @@ function main() {
 </pre></dt>
 <dd>
 
-
+raise when creating thread with non-unique name
 
 </dd>
 <a id="ThreadMessageKind"></a>
@@ -529,6 +547,22 @@ Create token for new threadproxy
 Create new thread managed by <tt class="docutils literal"><span class="pre">proxy</span></tt> with an unique <tt class="docutils literal"><span class="pre">name</span></tt>
 
 </dd>
+<a id="pinToCpu,MainThreadProxy,string,Natural"></a>
+<dt><pre><span class="Keyword">proc</span> <a href="#pinToCpu%2CMainThreadProxy%2Cstring%2CNatural"><span class="Identifier">pinToCpu</span></a><span class="Other">(</span><span class="Identifier">proxy</span><span class="Other">:</span> <a href="threadproxy.html#MainThreadProxy"><span class="Identifier">MainThreadProxy</span></a><span class="Other">;</span> <span class="Identifier">name</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">cpu</span><span class="Other">:</span> <span class="Identifier">Natural</span><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma">
+    <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ThreadNotFoundError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+<dd>
+
+Pin thread <tt class="docutils literal"><span class="pre">name</span></tt> to cpu. Raise ThreadNotFoundError if name not found.
+
+</dd>
+<a id="isThreadRunning,MainThreadProxy,string"></a>
+<dt><pre><span class="Keyword">proc</span> <a href="#isThreadRunning%2CMainThreadProxy%2Cstring"><span class="Identifier">isThreadRunning</span></a><span class="Other">(</span><span class="Identifier">proxy</span><span class="Other">:</span> <a href="threadproxy.html#MainThreadProxy"><span class="Identifier">MainThreadProxy</span></a><span class="Other">;</span> <span class="Identifier">name</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma">
+    <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ThreadNotFoundError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+<dd>
+
+Check whether thread is running. Applicable only to threads created with <tt class="docutils literal"><span class="pre">createThread</span></tt>
+
+</dd>
 
 </dl></div>
 <div class="section" id="18">
@@ -558,7 +592,7 @@ Create new thread managed by <tt class="docutils literal"><span class="pre">prox
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br/>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2020-05-23 10:34:47 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2020-05-23 10:51:28 UTC</small>
       </div>
     </div>
   </div>
