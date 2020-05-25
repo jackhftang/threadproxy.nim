@@ -9,13 +9,13 @@ Simplify Nim Inter-Thread Communication
 - Each thread processes its channel with `threadproxy.poll`.
 - JSON is the data exchange format.
 - Threads can talk with each other with `name` reference. 
-- Threads can talk with each other in uni-directional with `send`.
-- Threads can talk with each other in two-directional way with `ask`.
+- Threads can talk with each other in one-way with `send()`.
+- Threads can talk with each other in two-way with `ask()`.
 - The order of creation of threads does not matter as long as the target thread is running at the time of calling `send` or `ask`.
 
 ## Usage 
 
-The general pattern should look like the following.
+The typical pattern should look like the following.
 
 ```nim
 import threadproxy
