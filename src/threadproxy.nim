@@ -11,27 +11,31 @@ type
     threadName: string
 
   ReceiverNotFoundError* = object of ThreadProxyError
-    ## raised whenever thread with name not found
+    ## Raised whenever thread with name not found
     sender: string
     receiver: string
 
   MessageUndeliveredError* = object of ThreadProxyError
-    ## raised when message cannot be send to channel
+    ## Raised when message cannot be send to channel
     kind: ThreadMessageKind
     action: string
     sender: string
     data: JsonNode
 
   ActionConflictError* = object of ThreadProxyError
-    ## raised when registering action with non-unique name
+    ## Raised when registering action with non-unique name
     threadName: string
     action: string
 
   NameConflictError* = object of ThreadProxyError
-    ## raise when creating thread with non-unique name
+    ## Raise when creating thread with non-unique name
     threadName: string
 
-  ThreadMessageKind* = enum
+  PollConflictError* = object of ThreadProxyError
+    ## Raise when poll() is called while ThreadProxy is running
+    threadName: string
+
+  ThreadMessageKind = enum
     EMIT, REQUEST, REPLY, SYS
 
   SysMsg = enum 
@@ -85,10 +89,10 @@ proc finalize(ch: ThreadChannelWrapper) =
   ch.self[].close()
   deallocShared(ch.self)
 
-proc newThreadChannel(): ThreadChannelWrapper =
+proc newThreadChannel(channelMaxItems: int): ThreadChannelWrapper =
   result.new(finalize)
   result.self = cast[ThreadChannelPtr](allocShared0(sizeof(ThreadChannel)))
-  result.self[].open()
+  result.self[].open(channelMaxItems)
 
 proc finalize(th: ThreadWrapper) =
   dealloc(th.self)
@@ -102,6 +106,7 @@ proc defaultAction(action: string, data: JsonNode): Future[JsonNode] {.async.} =
   return nil
 
 proc newThreadProxy*(token: ThreadToken): ThreadProxy =
+  ## Create a new ThreadProxy
   ThreadProxy(
     name: token.name,
     mainChannel: token.mainChannel,
@@ -112,8 +117,9 @@ proc newThreadProxy*(token: ThreadToken): ThreadProxy =
     defaultAction: defaultAction
   )
 
-proc newMainThreadProxy*(name: string): MainThreadProxy =
-  let ch = newThreadChannel()
+proc newMainThreadProxy*(name: string, channelMaxItems: int = 0): MainThreadProxy =
+  ## Create a new MainThreadProxy
+  let ch = newThreadChannel(channelMaxItems)
   var channels = initTable[string, ThreadChannelWrapper]()
   channels[name] = ch
   MainThreadProxy(
@@ -127,7 +133,7 @@ proc newMainThreadProxy*(name: string): MainThreadProxy =
     channels: channels
   )
     
-proc newMessage*(
+proc newMessage(
   proxy: ThreadProxy, 
   kind: ThreadMessageKind, 
   action: string, 
@@ -142,7 +148,7 @@ proc newMessage*(
     callbackId: callbackId
   ) 
 
-proc newSysMessage*(
+proc newSysMessage(
   action: string, 
   channel: ThreadChannelPtr,
   data: JsonNode = nil, 
@@ -162,7 +168,9 @@ proc isNameAvailable*(proxy: MainThreadProxy, name: string): bool {.inline.} = n
 
 proc isMainThreadProxy(proxy: ThreadProxy): bool {.inline.} = proxy.channel == proxy.mainChannel
 
-proc isRunning*(proxy: ThreadProxy): bool {.inline.} = proxy.active
+proc isRunning*(proxy: ThreadProxy): bool {.inline.} = 
+  ## Check if `proxy` is running 
+  proxy.active
 
 proc nextCallbackId(proxy: ThreadProxy): int {.inline.} = 
   # start with 1, callbackId = 0 means no callbacks
@@ -183,6 +191,7 @@ proc onDefault*(proxy: ThreadProxy, handler: ThreadDefaultActionHandler) =
   proxy.defaultAction = handler
 
 template onData*(proxy: ThreadProxy, action: string, body: untyped): void =    
+  ## Template version of `on`
   proxy.on(
     action, 
     proc(json: JsonNode): Future[JsonNode] {.gcsafe,async.} = 
@@ -191,12 +200,15 @@ template onData*(proxy: ThreadProxy, action: string, body: untyped): void =
   )
 
 template onDefaultData*(proxy: ThreadProxy, body: untyped) =
+  ## Template version of `onDefault`
   proxy.onDefault proc(a: string, j: JsonNode): Future[JsonNode] {.gcsafe,async.} =
     let action {.inject.} = a
     let data {.inject.} = j
     `body`
   
 proc send*(proxy: ThreadProxy, target: ThreadChannelPtr, action: string, data: JsonNode): Future[void] =
+  ## Send `data` to `target` channel and then complete.
+  ## Raise MessageUndeliveredError if cannot put on to target channel. 
   result = newFuture[void]("send")
   let sent = target[].trySend proxy.newMessage(EMIT, action, data) 
   if sent: 
@@ -210,6 +222,7 @@ proc send*(proxy: ThreadProxy, target: ThreadChannelPtr, action: string, data: J
     result.fail(err)
 
 proc ask*(proxy: ThreadProxy, target: ThreadChannelPtr, action: string, data: JsonNode = nil): Future[JsonNode] =
+  ## Send `data` to `target` channel and then wait for reply
   let id = proxy.nextCallbackId() 
   result = newFuture[JsonNode]("ask")
   proxy.jsonCallbacks[id] = result
@@ -227,6 +240,7 @@ proc getChannel*(proxy: ThreadProxy, name: string): Future[ThreadChannelPtr] =
   ## Resolve name to channel
   
   if proxy.isMainThreadProxy:
+    # get from channels
     let mainProxy = cast[MainThreadProxy](proxy)
     let ch = mainProxy.channels.getOrDefault(name, nil)
     if not ch.isNil:
@@ -341,6 +355,8 @@ proc process*(proxy: ThreadProxy): bool =
 proc stop*(proxy: ThreadProxy) {.inline.} = proxy.active = false
 
 proc poll*(proxy: ThreadProxy, interval: int = 16): Future[void] =
+  ## Start processing channel messages.
+  ## Raise PollConflictError if proxy is already running
   var future = newFuture[void]("poll")
   result = future
 
@@ -356,10 +372,15 @@ proc poll*(proxy: ThreadProxy, interval: int = 16): Future[void] =
     else:
       future.complete()
 
-  proxy.active = true
-  loop()
+  if proxy.active:
+    var err = newException(PollConflictError, "ThreadProxy is already started")
+    err.threadName = proxy.name
+    result.fail(err)
+  else:
+    proxy.active = true
+    loop()
 
-proc createToken*(proxy: MainThreadProxy, name: string): ThreadToken =
+proc createToken*(proxy: MainThreadProxy, name: string, channelMaxItems: int = 0): ThreadToken =
   ## Create token for new threadproxy
   
   # Check name availability
@@ -369,7 +390,7 @@ proc createToken*(proxy: MainThreadProxy, name: string): ThreadToken =
     raise err
 
   # check new channel
-  let ch = newThreadChannel()
+  let ch = newThreadChannel(channelMaxItems)
   proxy.channels[name] = ch
   return ThreadToken(
     name: name,
@@ -377,11 +398,11 @@ proc createToken*(proxy: MainThreadProxy, name: string): ThreadToken =
     channel: ch.self
   )
 
-proc createThread*(proxy: MainThreadProxy, name: string, main: ThreadMainProc) =
+proc createThread*(proxy: MainThreadProxy, name: string, main: ThreadMainProc, channelMaxItems: int = 0) =
   ## Create new thread managed by `proxy` with an unique `name`
   
   # createToken will check name availability
-  let token = proxy.createToken(name)
+  let token = proxy.createToken(name, channelMaxItems)
 
   # create thread wrapper to prevent GC
   let thread = newThread()
