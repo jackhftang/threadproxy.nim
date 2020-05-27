@@ -8,32 +8,32 @@ type
 
   ThreadNotFoundError* = object of ThreadProxyError
     ## Raised when thread with name cannot be found
-    threadName: string
+    threadName*: string
 
   ReceiverNotFoundError* = object of ThreadProxyError
     ## Raised whenever thread with name not found
-    sender: string
-    receiver: string
+    sender*: string
+    receiver*: string
 
   MessageUndeliveredError* = object of ThreadProxyError
     ## Raised when message cannot be send to channel
-    kind: ThreadMessageKind
-    action: string
-    sender: string
-    data: JsonNode
+    kind*: ThreadMessageKind
+    action*: string
+    sender*: string
+    data*: JsonNode
 
   ActionConflictError* = object of ThreadProxyError
     ## Raised when registering action with non-unique name
-    threadName: string
-    action: string
+    threadName*: string
+    action*: string
 
   NameConflictError* = object of ThreadProxyError
     ## Raise when creating thread with non-unique name
-    threadName: string
+    threadName*: string
 
   PollConflictError* = object of ThreadProxyError
     ## Raise when poll() is called while ThreadProxy is running
-    threadName: string
+    threadName*: string
 
   ThreadMessageKind = enum
     EMIT, REQUEST, REPLY, SYS
