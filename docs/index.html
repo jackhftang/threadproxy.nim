@@ -104,27 +104,27 @@ function main() {
     title="ThreadProxyError = object of CatchableError"><wbr />Thread<wbr />Proxy<wbr />Error<span class="attachedType"></span></a></li>
   <li><a class="reference" href="#ThreadNotFoundError"
     title="ThreadNotFoundError = object of ThreadProxyError
-  threadName: string"><wbr />Thread<wbr />Not<wbr />Found<wbr />Error<span class="attachedType"></span></a></li>
+  threadName*: string"><wbr />Thread<wbr />Not<wbr />Found<wbr />Error<span class="attachedType"></span></a></li>
   <li><a class="reference" href="#ReceiverNotFoundError"
     title="ReceiverNotFoundError = object of ThreadProxyError
-  sender: string
-  receiver: string"><wbr />Receiver<wbr />Not<wbr />Found<wbr />Error<span class="attachedType"></span></a></li>
+  sender*: string
+  receiver*: string"><wbr />Receiver<wbr />Not<wbr />Found<wbr />Error<span class="attachedType"></span></a></li>
   <li><a class="reference" href="#MessageUndeliveredError"
     title="MessageUndeliveredError = object of ThreadProxyError
-  kind: ThreadMessageKind
-  action: string
-  sender: string
-  data: JsonNode"><wbr />Message<wbr />Undelivered<wbr />Error<span class="attachedType"></span></a></li>
+  kind*: ThreadMessageKind
+  action*: string
+  sender*: string
+  data*: JsonNode"><wbr />Message<wbr />Undelivered<wbr />Error<span class="attachedType"></span></a></li>
   <li><a class="reference" href="#ActionConflictError"
     title="ActionConflictError = object of ThreadProxyError
-  threadName: string
-  action: string"><wbr />Action<wbr />Conflict<wbr />Error<span class="attachedType"></span></a></li>
+  threadName*: string
+  action*: string"><wbr />Action<wbr />Conflict<wbr />Error<span class="attachedType"></span></a></li>
   <li><a class="reference" href="#NameConflictError"
     title="NameConflictError = object of ThreadProxyError
-  threadName: string"><wbr />Name<wbr />Conflict<wbr />Error<span class="attachedType"></span></a></li>
+  threadName*: string"><wbr />Name<wbr />Conflict<wbr />Error<span class="attachedType"></span></a></li>
   <li><a class="reference" href="#PollConflictError"
     title="PollConflictError = object of ThreadProxyError
-  threadName: string"><wbr />Poll<wbr />Conflict<wbr />Error<span class="attachedType"></span></a></li>
+  threadName*: string"><wbr />Poll<wbr />Conflict<wbr />Error<span class="attachedType"></span></a></li>
   <li><a class="reference" href="#ThreadMessage"
     title="ThreadMessage = object
   kind: ThreadMessageKind
@@ -244,7 +244,7 @@ function main() {
 </dd>
 <a id="ThreadNotFoundError"></a>
 <dt><pre><a href="threadproxy.html#ThreadNotFoundError"><span class="Identifier">ThreadNotFoundError</span></a> <span class="Other">=</span> <span class="Keyword">object</span> <span class="Keyword">of</span> <a href="threadproxy.html#ThreadProxyError"><span class="Identifier">ThreadProxyError</span></a>
-  <span class="Identifier">threadName</span><span class="Other">:</span> <span class="Identifier">string</span>
+  <span class="Identifier">threadName</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
 </pre></dt>
 <dd>
 
@@ -253,8 +253,8 @@ Raised when thread with name cannot be found
 </dd>
 <a id="ReceiverNotFoundError"></a>
 <dt><pre><a href="threadproxy.html#ReceiverNotFoundError"><span class="Identifier">ReceiverNotFoundError</span></a> <span class="Other">=</span> <span class="Keyword">object</span> <span class="Keyword">of</span> <a href="threadproxy.html#ThreadProxyError"><span class="Identifier">ThreadProxyError</span></a>
-  <span class="Identifier">sender</span><span class="Other">:</span> <span class="Identifier">string</span>
-  <span class="Identifier">receiver</span><span class="Other">:</span> <span class="Identifier">string</span>
+  <span class="Identifier">sender</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
+  <span class="Identifier">receiver</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
 </pre></dt>
 <dd>
 
@@ -263,10 +263,10 @@ Raised whenever thread with name not found
 </dd>
 <a id="MessageUndeliveredError"></a>
 <dt><pre><a href="threadproxy.html#MessageUndeliveredError"><span class="Identifier">MessageUndeliveredError</span></a> <span class="Other">=</span> <span class="Keyword">object</span> <span class="Keyword">of</span> <a href="threadproxy.html#ThreadProxyError"><span class="Identifier">ThreadProxyError</span></a>
-  <span class="Identifier">kind</span><span class="Other">:</span> <span class="Identifier">ThreadMessageKind</span>
-  <span class="Identifier">action</span><span class="Other">:</span> <span class="Identifier">string</span>
-  <span class="Identifier">sender</span><span class="Other">:</span> <span class="Identifier">string</span>
-  <span class="Identifier">data</span><span class="Other">:</span> <span class="Identifier">JsonNode</span>
+  <span class="Identifier">kind</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">ThreadMessageKind</span>
+  <span class="Identifier">action</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
+  <span class="Identifier">sender</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
+  <span class="Identifier">data</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">JsonNode</span>
 </pre></dt>
 <dd>
 
@@ -275,8 +275,8 @@ Raised when message cannot be send to channel
 </dd>
 <a id="ActionConflictError"></a>
 <dt><pre><a href="threadproxy.html#ActionConflictError"><span class="Identifier">ActionConflictError</span></a> <span class="Other">=</span> <span class="Keyword">object</span> <span class="Keyword">of</span> <a href="threadproxy.html#ThreadProxyError"><span class="Identifier">ThreadProxyError</span></a>
-  <span class="Identifier">threadName</span><span class="Other">:</span> <span class="Identifier">string</span>
-  <span class="Identifier">action</span><span class="Other">:</span> <span class="Identifier">string</span>
+  <span class="Identifier">threadName</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
+  <span class="Identifier">action</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
 </pre></dt>
 <dd>
 
@@ -285,7 +285,7 @@ Raised when registering action with non-unique name
 </dd>
 <a id="NameConflictError"></a>
 <dt><pre><a href="threadproxy.html#NameConflictError"><span class="Identifier">NameConflictError</span></a> <span class="Other">=</span> <span class="Keyword">object</span> <span class="Keyword">of</span> <a href="threadproxy.html#ThreadProxyError"><span class="Identifier">ThreadProxyError</span></a>
-  <span class="Identifier">threadName</span><span class="Other">:</span> <span class="Identifier">string</span>
+  <span class="Identifier">threadName</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
 </pre></dt>
 <dd>
 
@@ -294,7 +294,7 @@ Raise when creating thread with non-unique name
 </dd>
 <a id="PollConflictError"></a>
 <dt><pre><a href="threadproxy.html#PollConflictError"><span class="Identifier">PollConflictError</span></a> <span class="Other">=</span> <span class="Keyword">object</span> <span class="Keyword">of</span> <a href="threadproxy.html#ThreadProxyError"><span class="Identifier">ThreadProxyError</span></a>
-  <span class="Identifier">threadName</span><span class="Other">:</span> <span class="Identifier">string</span>
+  <span class="Identifier">threadName</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
 </pre></dt>
 <dd>
 
@@ -573,7 +573,7 @@ Template version of <tt class="docutils literal"><span class="pre">onDefault</sp
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br/>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2020-05-25 16:30:11 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2020-05-27 14:30:37 UTC</small>
       </div>
     </div>
   </div>
