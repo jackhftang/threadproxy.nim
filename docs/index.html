@@ -125,17 +125,6 @@ function main() {
   <li><a class="reference" href="#PollConflictError"
     title="PollConflictError = object of ThreadProxyError
   threadName*: string"><wbr />Poll<wbr />Conflict<wbr />Error<span class="attachedType"></span></a></li>
-  <li><a class="reference" href="#ThreadMessage"
-    title="ThreadMessage = object
-  kind: ThreadMessageKind
-  action: string
-  json: JsonNode
-  channel: ThreadChannelPtr
-  callbackId: int"><wbr />Thread<wbr />Message<span class="attachedType"></span></a></li>
-  <li><a class="reference" href="#ThreadChannel"
-    title="ThreadChannel = Channel[ThreadMessage]"><wbr />Thread<wbr />Channel<span class="attachedType"></span></a></li>
-  <li><a class="reference" href="#ThreadChannelPtr"
-    title="ThreadChannelPtr = ptr Channel[ThreadMessage]"><wbr />Thread<wbr />Channel<wbr />Ptr<span class="attachedType"></span></a></li>
   <li><a class="reference" href="#ThreadActionHandler"
     title="ThreadActionHandler = proc (data: JsonNode): Future[JsonNode] {.gcsafe.}"><wbr />Thread<wbr />Action<wbr />Handler<span class="attachedType"></span></a></li>
   <li><a class="reference" href="#ThreadDefaultActionHandler"
@@ -145,7 +134,7 @@ function main() {
     title="ThreadProxy = ref object of RootObj
   active: bool
   name: string
-  mainChannel, channel: ThreadChannelPtr
+  mainFastChannel, fastChannel, channel: ThreadChannelPtr
   actions: Table[string, ThreadActionHandler]
   defaultAction: ThreadDefaultActionHandler
   callbackSeed: int
@@ -154,12 +143,12 @@ function main() {
   directory: Table[string, ThreadChannelPtr]"><wbr />Thread<wbr />Proxy<span class="attachedType"></span></a></li>
   <li><a class="reference" href="#MainThreadProxy"
     title="MainThreadProxy = ref object of ThreadProxy
-  channels: Table[string, ThreadChannelWrapper]
+  channels: Table[string, ThreadChannelPair]
   threads: Table[string, ThreadWrapper]"><wbr />Main<wbr />Thread<wbr />Proxy<span class="attachedType"></span></a></li>
   <li><a class="reference" href="#ThreadToken"
     title="ThreadToken = object
   name: string
-  mainChannel, channel: ThreadChannelPtr"><wbr />Thread<wbr />Token<span class="attachedType"></span></a></li>
+  mainFastChannel, fastChannel, channel: ThreadChannelPtr"><wbr />Thread<wbr />Token<span class="attachedType"></span></a></li>
   <li><a class="reference" href="#ThreadMainProc"
     title="ThreadMainProc = proc (proxy: ThreadProxy) {.thread, nimcall.}"><wbr />Thread<wbr />Main<wbr />Proc<span class="attachedType"></span></a></li>
 
@@ -182,12 +171,6 @@ function main() {
     title="on(proxy: ThreadProxy; action: string; handler: ThreadActionHandler)"><wbr />on<span class="attachedType">ThreadProxy</span></a></li>
   <li><a class="reference" href="#onDefault%2CThreadProxy%2CThreadDefaultActionHandler"
     title="onDefault(proxy: ThreadProxy; handler: ThreadDefaultActionHandler)"><wbr />on<wbr />Default<span class="attachedType">ThreadProxy</span></a></li>
-  <li><a class="reference" href="#send%2CThreadProxy%2CThreadChannelPtr%2Cstring%2CJsonNode"
-    title="send(proxy: ThreadProxy; target: ThreadChannelPtr; action: string; data: JsonNode): Future[
-    void]"><wbr />send<span class="attachedType">ThreadProxy</span></a></li>
-  <li><a class="reference" href="#ask%2CThreadProxy%2CThreadChannelPtr%2Cstring%2CJsonNode"
-    title="ask(proxy: ThreadProxy; target: ThreadChannelPtr; action: string; data: JsonNode = nil): Future[
-    JsonNode]"><wbr />ask<span class="attachedType">ThreadProxy</span></a></li>
   <li><a class="reference" href="#getChannel%2CThreadProxy%2Cstring"
     title="getChannel(proxy: ThreadProxy; name: string): Future[ThreadChannelPtr]"><wbr />get<wbr />Channel<span class="attachedType">ThreadProxy</span></a></li>
   <li><a class="reference" href="#send%2CThreadProxy%2Cstring%2Cstring%2CJsonNode"
@@ -301,33 +284,6 @@ Raise when creating thread with non-unique name
 Raise when poll() is called while ThreadProxy is running
 
 </dd>
-<a id="ThreadMessage"></a>
-<dt><pre><a href="threadproxy.html#ThreadMessage"><span class="Identifier">ThreadMessage</span></a> <span class="Other">=</span> <span class="Keyword">object</span>
-  <span class="Identifier">kind</span><span class="Other">:</span> <span class="Identifier">ThreadMessageKind</span>
-  <span class="Identifier">action</span><span class="Other">:</span> <span class="Identifier">string</span>
-  <span class="Identifier">json</span><span class="Other">:</span> <span class="Identifier">JsonNode</span>
-  <span class="Identifier">channel</span><span class="Other">:</span> <a href="threadproxy.html#ThreadChannelPtr"><span class="Identifier">ThreadChannelPtr</span></a>
-  <span class="Identifier">callbackId</span><span class="Other">:</span> <span class="Identifier">int</span>
-</pre></dt>
-<dd>
-
-
-
-</dd>
-<a id="ThreadChannel"></a>
-<dt><pre><a href="threadproxy.html#ThreadChannel"><span class="Identifier">ThreadChannel</span></a> <span class="Other">=</span> <span class="Identifier">Channel</span><span class="Other">[</span><a href="threadproxy.html#ThreadMessage"><span class="Identifier">ThreadMessage</span></a><span class="Other">]</span></pre></dt>
-<dd>
-
-
-
-</dd>
-<a id="ThreadChannelPtr"></a>
-<dt><pre><a href="threadproxy.html#ThreadChannelPtr"><span class="Identifier">ThreadChannelPtr</span></a> <span class="Other">=</span> <span class="Keyword">ptr</span> <span class="Identifier">Channel</span><span class="Other">[</span><a href="threadproxy.html#ThreadMessage"><span class="Identifier">ThreadMessage</span></a><span class="Other">]</span></pre></dt>
-<dd>
-
-
-
-</dd>
 <a id="ThreadActionHandler"></a>
 <dt><pre><a href="threadproxy.html#ThreadActionHandler"><span class="Identifier">ThreadActionHandler</span></a> <span class="Other">=</span> <span class="Keyword">proc</span> <span class="Other">(</span><span class="Identifier">data</span><span class="Other">:</span> <span class="Identifier">JsonNode</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">Future</span><span class="Other">[</span><span class="Identifier">JsonNode</span><span class="Other">]</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">gcsafe</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
@@ -347,13 +303,13 @@ Raise when poll() is called while ThreadProxy is running
 <dt><pre><a href="threadproxy.html#ThreadProxy"><span class="Identifier">ThreadProxy</span></a> <span class="Other">=</span> <span class="Keyword">ref</span> <span class="Keyword">object</span> <span class="Keyword">of</span> <span class="Identifier">RootObj</span>
   <span class="Identifier">active</span><span class="Other">:</span> <span class="Identifier">bool</span>
   <span class="Identifier">name</span><span class="Other">:</span> <span class="Identifier">string</span>
-  <span class="Identifier">mainChannel</span><span class="Other">,</span> <span class="Identifier">channel</span><span class="Other">:</span> <a href="threadproxy.html#ThreadChannelPtr"><span class="Identifier">ThreadChannelPtr</span></a>
+  <span class="Identifier">mainFastChannel</span><span class="Other">,</span> <span class="Identifier">fastChannel</span><span class="Other">,</span> <span class="Identifier">channel</span><span class="Other">:</span> <span class="Identifier">ThreadChannelPtr</span>
   <span class="Identifier">actions</span><span class="Other">:</span> <span class="Identifier">Table</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">,</span> <a href="threadproxy.html#ThreadActionHandler"><span class="Identifier">ThreadActionHandler</span></a><span class="Other">]</span>
   <span class="Identifier">defaultAction</span><span class="Other">:</span> <a href="threadproxy.html#ThreadDefaultActionHandler"><span class="Identifier">ThreadDefaultActionHandler</span></a>
   <span class="Identifier">callbackSeed</span><span class="Other">:</span> <span class="Identifier">int</span>
   <span class="Identifier">jsonCallbacks</span><span class="Other">:</span> <span class="Identifier">Table</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">,</span> <span class="Identifier">Future</span><span class="Other">[</span><span class="Identifier">JsonNode</span><span class="Other">]</span><span class="Other">]</span>
-  <span class="Identifier">channelCallbacks</span><span class="Other">:</span> <span class="Identifier">Table</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">,</span> <span class="Identifier">Future</span><span class="Other">[</span><a href="threadproxy.html#ThreadChannelPtr"><span class="Identifier">ThreadChannelPtr</span></a><span class="Other">]</span><span class="Other">]</span>
-  <span class="Identifier">directory</span><span class="Other">:</span> <span class="Identifier">Table</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">,</span> <a href="threadproxy.html#ThreadChannelPtr"><span class="Identifier">ThreadChannelPtr</span></a><span class="Other">]</span>
+  <span class="Identifier">channelCallbacks</span><span class="Other">:</span> <span class="Identifier">Table</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">,</span> <span class="Identifier">Future</span><span class="Other">[</span><span class="Identifier">ThreadChannelPtr</span><span class="Other">]</span><span class="Other">]</span>
+  <span class="Identifier">directory</span><span class="Other">:</span> <span class="Identifier">Table</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">,</span> <span class="Identifier">ThreadChannelPtr</span><span class="Other">]</span>
 </pre></dt>
 <dd>
 
@@ -362,7 +318,7 @@ Raise when poll() is called while ThreadProxy is running
 </dd>
 <a id="MainThreadProxy"></a>
 <dt><pre><a href="threadproxy.html#MainThreadProxy"><span class="Identifier">MainThreadProxy</span></a> <span class="Other">=</span> <span class="Keyword">ref</span> <span class="Keyword">object</span> <span class="Keyword">of</span> <a href="threadproxy.html#ThreadProxy"><span class="Identifier">ThreadProxy</span></a>
-  <span class="Identifier">channels</span><span class="Other">:</span> <span class="Identifier">Table</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">,</span> <span class="Identifier">ThreadChannelWrapper</span><span class="Other">]</span>
+  <span class="Identifier">channels</span><span class="Other">:</span> <span class="Identifier">Table</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">,</span> <span class="Identifier">ThreadChannelPair</span><span class="Other">]</span>
   <span class="Identifier">threads</span><span class="Other">:</span> <span class="Identifier">Table</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">,</span> <span class="Identifier">ThreadWrapper</span><span class="Other">]</span>
 </pre></dt>
 <dd>
@@ -373,7 +329,7 @@ Raise when poll() is called while ThreadProxy is running
 <a id="ThreadToken"></a>
 <dt><pre><a href="threadproxy.html#ThreadToken"><span class="Identifier">ThreadToken</span></a> <span class="Other">=</span> <span class="Keyword">object</span>
   <span class="Identifier">name</span><span class="Other">:</span> <span class="Identifier">string</span>
-  <span class="Identifier">mainChannel</span><span class="Other">,</span> <span class="Identifier">channel</span><span class="Other">:</span> <a href="threadproxy.html#ThreadChannelPtr"><span class="Identifier">ThreadChannelPtr</span></a>
+  <span class="Identifier">mainFastChannel</span><span class="Other">,</span> <span class="Identifier">fastChannel</span><span class="Other">,</span> <span class="Identifier">channel</span><span class="Other">:</span> <span class="Identifier">ThreadChannelPtr</span>
 </pre></dt>
 <dd>
 
@@ -442,28 +398,11 @@ Set <tt class="docutils literal"><span class="pre">handler</span></tt> for <tt c
     <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
-Set default <tt class="docutils literal"><span class="pre">handler</span></tt>
-
-</dd>
-<a id="send,ThreadProxy,ThreadChannelPtr,string,JsonNode"></a>
-<dt><pre><span class="Keyword">proc</span> <a href="#send%2CThreadProxy%2CThreadChannelPtr%2Cstring%2CJsonNode"><span class="Identifier">send</span></a><span class="Other">(</span><span class="Identifier">proxy</span><span class="Other">:</span> <a href="threadproxy.html#ThreadProxy"><span class="Identifier">ThreadProxy</span></a><span class="Other">;</span> <span class="Identifier">target</span><span class="Other">:</span> <a href="threadproxy.html#ThreadChannelPtr"><span class="Identifier">ThreadChannelPtr</span></a><span class="Other">;</span> <span class="Identifier">action</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">data</span><span class="Other">:</span> <span class="Identifier">JsonNode</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">Future</span><span class="Other">[</span>
-    <span class="Identifier">void</span><span class="Other">]</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">DeadThreadError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">FutureError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
-<dd>
-
-Send <tt class="docutils literal"><span class="pre">data</span></tt> to <tt class="docutils literal"><span class="pre">target</span></tt> channel and then complete. Raise MessageUndeliveredError if cannot put on to target channel. 
-
-</dd>
-<a id="ask,ThreadProxy,ThreadChannelPtr,string,JsonNode"></a>
-<dt><pre><span class="Keyword">proc</span> <a href="#ask%2CThreadProxy%2CThreadChannelPtr%2Cstring%2CJsonNode"><span class="Identifier">ask</span></a><span class="Other">(</span><span class="Identifier">proxy</span><span class="Other">:</span> <a href="threadproxy.html#ThreadProxy"><span class="Identifier">ThreadProxy</span></a><span class="Other">;</span> <span class="Identifier">target</span><span class="Other">:</span> <a href="threadproxy.html#ThreadChannelPtr"><span class="Identifier">ThreadChannelPtr</span></a><span class="Other">;</span> <span class="Identifier">action</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span>
-        <span class="Identifier">data</span><span class="Other">:</span> <span class="Identifier">JsonNode</span> <span class="Other">=</span> <span class="Keyword">nil</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">Future</span><span class="Other">[</span><span class="Identifier">JsonNode</span><span class="Other">]</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma">
-    <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">DeadThreadError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">FutureError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
-<dd>
-
-Send <tt class="docutils literal"><span class="pre">data</span></tt> to <tt class="docutils literal"><span class="pre">target</span></tt> channel and then wait for reply
+Set default <tt class="docutils literal"><span class="pre">handler</span></tt> for all unhandled action
 
 </dd>
 <a id="getChannel,ThreadProxy,string"></a>
-<dt><pre><span class="Keyword">proc</span> <a href="#getChannel%2CThreadProxy%2Cstring"><span class="Identifier">getChannel</span></a><span class="Other">(</span><span class="Identifier">proxy</span><span class="Other">:</span> <a href="threadproxy.html#ThreadProxy"><span class="Identifier">ThreadProxy</span></a><span class="Other">;</span> <span class="Identifier">name</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">Future</span><span class="Other">[</span><a href="threadproxy.html#ThreadChannelPtr"><span class="Identifier">ThreadChannelPtr</span></a><span class="Other">]</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma">
+<dt><pre><span class="Keyword">proc</span> <a href="#getChannel%2CThreadProxy%2Cstring"><span class="Identifier">getChannel</span></a><span class="Other">(</span><span class="Identifier">proxy</span><span class="Other">:</span> <a href="threadproxy.html#ThreadProxy"><span class="Identifier">ThreadProxy</span></a><span class="Other">;</span> <span class="Identifier">name</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">Future</span><span class="Other">[</span><span class="Identifier">ThreadChannelPtr</span><span class="Other">]</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma">
     <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">FutureError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">DeadThreadError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
@@ -475,7 +414,9 @@ Resolve name to channel
     <span class="Identifier">void</span><span class="Other">]</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">FutureError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
-put one message to <tt class="docutils literal"><span class="pre">target</span></tt>'s channel
+<p>Send <tt class="docutils literal"><span class="pre">data</span></tt> to <tt class="docutils literal"><span class="pre">target</span></tt> channel.</p>
+<p>The returned future complete once the message is successfully placed on target channel. otherwise fail with MessageUndeliveredError.</p>
+
 
 </dd>
 <a id="ask,ThreadProxy,string,string,JsonNode"></a>
@@ -483,7 +424,9 @@ put one message to <tt class="docutils literal"><span class="pre">target</span><
     <span class="Identifier">JsonNode</span><span class="Other">]</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">FutureError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
-put one message to target's channel and complete until <tt class="docutils literal"><span class="pre">target</span></tt>'s response
+<p>Send <tt class="docutils literal"><span class="pre">data</span></tt> to <tt class="docutils literal"><span class="pre">target</span></tt> and wait for the return.</p>
+<p>The returned future will complete with the result from target is received. It may fail with many kind of errors.</p>
+
 
 </dd>
 <a id="process,ThreadProxy"></a>
@@ -553,7 +496,7 @@ Check whether thread is running. Applicable only to threads created with <tt cla
 <dt><pre><span class="Keyword">template</span> <a href="#onData.t%2CThreadProxy%2Cstring%2Cuntyped"><span class="Identifier">onData</span></a><span class="Other">(</span><span class="Identifier">proxy</span><span class="Other">:</span> <a href="threadproxy.html#ThreadProxy"><span class="Identifier">ThreadProxy</span></a><span class="Other">;</span> <span class="Identifier">action</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">body</span><span class="Other">:</span> <span class="Identifier">untyped</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">void</span></pre></dt>
 <dd>
 
-Template version of <tt class="docutils literal"><span class="pre">on</span></tt>
+Template version of <tt class="docutils literal"><span class="pre">on</span></tt>, saving you from typing <tt class="docutils literal"><span class="pre">proc(data: JsonNode): Future[JsonNode] {.gcsafe,async.} = ...</span></tt> every time. The argument <tt class="docutils literal"><span class="pre">data</span></tt> is injected and so the name <em>onData</em>.
 
 </dd>
 <a id="onDefaultData.t,ThreadProxy,untyped"></a>
@@ -573,7 +516,7 @@ Template version of <tt class="docutils literal"><span class="pre">onDefault</sp
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br/>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2020-05-27 14:30:37 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2020-05-28 18:38:52 UTC</small>
       </div>
     </div>
   </div>
