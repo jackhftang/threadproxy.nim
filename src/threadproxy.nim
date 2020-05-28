@@ -1,3 +1,6 @@
+when not(compileOption("threads")):
+  {.fatal: "--threads:on is required for threadproxy".}
+  
 import json, tables, asyncdispatch
 
 # almost always use together

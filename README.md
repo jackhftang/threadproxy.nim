@@ -9,9 +9,10 @@ ThreadProxy also provide a little thread-name-system and do name resolution for 
 
 Some key-points:
 
-- Each thread has a unique `name` assigned at creation.
-- Each thread start processesing its messages with `poll()`.
 - JSON is the *ONLY* data exchange format.
+- Each thread has a unique `name` assigned at creation.
+- Each thread can register a handle on action with `on(...)`
+- Each thread start processesing its messages with `poll()`.
 - Threads can talk with each other with `name` reference. 
 - Threads can talk with each other in one-way with `send(...): Future[void]`.
 - Threads can talk with each other in two-way with `ask(...): Future[JsonNode]`.
@@ -26,21 +27,21 @@ Internally:
 The typical pattern should look like the following.
 
 ```nim
-import threadproxy                                  # ---- 1
+import threadproxy                                    # ---- 1
 
-proc fooMain(proxy: ThreadProxy) {.thread.} =       # ---- 2 
+proc fooMain(proxy: ThreadProxy) {.thread.} =         # ---- 2 
   # setup and then poll threadProxy
   proxy.on "action1", proc(data: JsonNode): Future[JsonNode] {.gcsafe.} =   # ---- 3 
     result = action1(data)
   
-  proxy.onData "action2":                           # ---- 4
+  proxy.onData "action2":                             # ---- 4
     result = action2(data)
 
   proxy.onDefault proc(action: string, data: JsonNode): Future[JsonNode] {.gcsafe.} =  # ---- 5
     reuslt = ...
 
   # ... 
-  asyncCheck proxy.poll()                           # ---- 6
+  asyncCheck proxy.poll()                             # ---- 6
 
   # ... 
   # do something here
@@ -50,13 +51,14 @@ proc fooMain(proxy: ThreadProxy) {.thread.} =       # ---- 2
 
 proc main() =
   # create, setup and then poll mainThreadProxy
-  let proxy = newMainThreadProxy("main")            # ---- 7
-  proxy.onData "action1": result = action1(data)    # ---- 8
+  let proxy = newMainThreadProxy("main")              # ---- 7
+  proxy.onData "action1": result = action1(data)      # ---- 8
+  proxy.onDefaultData: result = handler(action, data) 
   # ...
-  asyncCheck proxy.poll()                           # ---- 9
+  asyncCheck proxy.poll()                             # ---- 9
 
   # create threads
-  proxy.createThread("foo1", fooMain)               # ---- 10
+  proxy.createThread("foo1", fooMain)                 # ---- 10
   proxy.createThread("foo2", fooMain)
   #... 
 
@@ -192,7 +194,7 @@ when isMainModule:
   main()
 ```
 
-see **/examples** for more examples
+see [/examples](/examples) for more examples.
 
 ## Manually Create Thread
 
