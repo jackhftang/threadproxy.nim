@@ -41,7 +41,7 @@ type
   SysMsg = enum 
     GET_NAME_REQ, GET_NAME_REP
 
-  ThreadMessage* = object
+  ThreadMessage = object
     kind: ThreadMessageKind
     action: string
     json: JsonNode
@@ -50,8 +50,8 @@ type
     channel: ThreadChannelPtr  
     callbackId: int
       
-  ThreadChannel* = Channel[ThreadMessage]
-  ThreadChannelPtr* = ptr Channel[ThreadMessage]
+  ThreadChannel = Channel[ThreadMessage]
+  ThreadChannelPtr = ptr Channel[ThreadMessage]
 
   ThreadActionHandler* = proc(data: JsonNode): Future[JsonNode] {.gcsafe.}
   ThreadDefaultActionHandler* = proc(action: string, data: JsonNode): Future[JsonNode] {.gcsafe.}

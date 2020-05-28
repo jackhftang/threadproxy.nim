@@ -10,6 +10,12 @@ proc workerMain(proxy: ThreadProxy) {.thread.} =
   proxy.onData "resend":
     asyncCheck proxy.send("main", "recev", data)
 
+  proxy.onDefaultData:
+    return %*{
+      "action": action,
+      "data": data
+    }
+
   asyncCheck proxy.poll()
 
 
@@ -52,6 +58,17 @@ suite "threadproxy":
     discard waitFor proxy.ask("worker1", "ping", %"pong")
     assert done    
 
+  test "onDefaultData":
+    let proxy = newMainThreadProxy("main")
+    asyncCheck proxy.poll()
+
+    proxy.createThread("worker1", workerMain)
+    
+    let a = waitFor proxy.ask("worker1", "some_unknown_action", %"pong")
+    assert a == %*{
+      "action": "some_unknown_action",
+      "data": "pong"
+    }
 
     
     
