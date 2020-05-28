@@ -1,4 +1,4 @@
-import threadproxy, asyncdispatch
+import threadproxy
 
 type
   WorkerThreadArgs = object

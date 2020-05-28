@@ -59,7 +59,7 @@ type
   ThreadProxy* = ref object of RootObj
     active: bool
     name: string
-    mainChannel, channel: ThreadChannelPtr
+    mainFastChannel, fastChannel, channel: ThreadChannelPtr
     actions: Table[string, ThreadActionHandler]
     defaultAction: ThreadDefaultActionHandler
     callbackSeed: int
@@ -75,13 +75,17 @@ type
     # manually manage memory to prevent GC
     self: ptr Thread[ThreadProxy]
 
+
+  ThreadChannelPair = ref object
+    channel, fastChannel: ThreadChannelWrapper
+
   MainThreadProxy* = ref object of ThreadProxy
-    channels: Table[string, ThreadChannelWrapper]
+    channels: Table[string, ThreadChannelPair]
     threads: Table[string, ThreadWrapper]
 
   ThreadToken* = object
     name: string
-    mainChannel, channel: ThreadChannelPtr
+    mainFastChannel, fastChannel, channel: ThreadChannelPtr
 
   ThreadMainProc* = proc(proxy: ThreadProxy) {.thread, nimcall.}
 
@@ -94,6 +98,11 @@ proc newThreadChannel(channelMaxItems: int): ThreadChannelWrapper =
   result.self = cast[ThreadChannelPtr](allocShared0(sizeof(ThreadChannel)))
   result.self[].open(channelMaxItems)
 
+# proc newThreadChannelPair(channelMaxItems: int): ThreadChannelPair =
+#   result.new()
+#   result.channel = newThreadChannel(channelMaxItems)
+#   result.fastChannel = newThreadChannel(0)
+
 proc finalize(th: ThreadWrapper) =
   dealloc(th.self)
 
@@ -102,14 +111,16 @@ proc newThread(): ThreadWrapper =
   result.self = cast[ptr Thread[ThreadProxy]](alloc0(sizeof(Thread[ThreadProxy])))
   
 proc defaultAction(action: string, data: JsonNode): Future[JsonNode] {.async.} =
-  echo "No handler for action: " & action & ", " & $data
+  # default action should ignore the message 
+  # echo "No handler for action: " & action & ", " & $data
   return nil
 
 proc newThreadProxy*(token: ThreadToken): ThreadProxy =
   ## Create a new ThreadProxy
   ThreadProxy(
     name: token.name,
-    mainChannel: token.mainChannel,
+    mainFastChannel: token.mainFastChannel,
+    fastChannel: token.fastChannel,
     channel: token.channel,
     callbackSeed: 0, 
     jsonCallbacks: initTable[int, Future[JsonNode]](),
@@ -120,11 +131,16 @@ proc newThreadProxy*(token: ThreadToken): ThreadProxy =
 proc newMainThreadProxy*(name: string, channelMaxItems: int = 0): MainThreadProxy =
   ## Create a new MainThreadProxy
   let ch = newThreadChannel(channelMaxItems)
-  var channels = initTable[string, ThreadChannelWrapper]()
-  channels[name] = ch
+  let fch = newThreadChannel(0)
+  var channels = initTable[string, ThreadChannelPair]()
+  channels[name] = ThreadChannelPair(
+    channel: ch,
+    fastChannel: fch
+  )
   MainThreadProxy(
     name: name,
-    mainChannel: ch.self,
+    mainFastChannel: fch.self,
+    fastChannel: fch.self,
     channel: ch.self,
     callbackSeed: 0,
     jsonCallbacks: initTable[int, Future[JsonNode]](),
@@ -166,7 +182,7 @@ proc name*(proxy: ThreadProxy): string {.inline.} = proxy.name
 
 proc isNameAvailable*(proxy: MainThreadProxy, name: string): bool {.inline.} = name notin proxy.channels
 
-proc isMainThreadProxy(proxy: ThreadProxy): bool {.inline.} = proxy.channel == proxy.mainChannel
+proc isMainThreadProxy(proxy: ThreadProxy): bool {.inline.} = proxy.fastChannel == proxy.mainFastChannel
 
 proc isRunning*(proxy: ThreadProxy): bool {.inline.} = 
   ## Check if `proxy` is running 
@@ -242,10 +258,10 @@ proc getChannel*(proxy: ThreadProxy, name: string): Future[ThreadChannelPtr] =
   if proxy.isMainThreadProxy:
     # get from channels
     let mainProxy = cast[MainThreadProxy](proxy)
-    let ch = mainProxy.channels.getOrDefault(name, nil)
-    if not ch.isNil:
+    let chp = mainProxy.channels.getOrDefault(name, nil)
+    if not chp.isNil:
       result = newFuture[ThreadChannelPtr]("getChannel")
-      result.complete(ch.self)
+      result.complete(chp.channel.self)
     else:
       var err = newException(ReceiverNotFoundError, "Cannot not find " & name)
       err.sender = proxy.name
@@ -263,7 +279,8 @@ proc getChannel*(proxy: ThreadProxy, name: string): Future[ThreadChannelPtr] =
       let id = proxy.nextCallbackId()
       result = newFuture[ThreadChannelPtr]("getChannel")
       proxy.channelCallbacks[id] = result
-      proxy.mainChannel[].send newSysMessage($GET_NAME_REQ, proxy.channel, %name, id)
+      # reply to fast Channel
+      proxy.mainFastChannel[].send newSysMessage($GET_NAME_REQ, proxy.fastChannel, %name, id)
   
 
 proc send*(proxy: ThreadProxy, target: string, action: string, data: JsonNode = nil): Future[void] {.async.} =
@@ -276,13 +293,7 @@ proc ask*(proxy: ThreadProxy, target: string, action: string, data: JsonNode = n
   let ch = await proxy.getChannel(target)
   result = await proxy.ask(ch, action, data)
 
-proc process*(proxy: ThreadProxy): bool =
-  ## Process one message on channel. Return false if channel is empty, otherwise true.
-  
-  let (hasData, event) = proxy.channel[].tryRecv()
-  result = hasData
-  if not hasData: return
-
+proc processEvent(proxy: ThreadProxy, event: ThreadMessage) =
   # for debug
   # echo proxy.name, event
 
@@ -323,13 +334,13 @@ proc process*(proxy: ThreadProxy): bool =
       let sender = event.channel
       # only MainThreadProxy should receive name_req
       let mainProxy = cast[MainThreadProxy](proxy)
-      let ch = mainProxy.channels.getOrDefault(name, nil)
-      if ch.isNil:
+      let chp = mainProxy.channels.getOrDefault(name, nil)
+      if chp.isNil:
         # cannot find name, send back with sender channel pointer
         sender[].send newSysMessage($GET_NAME_REP, sender, %name, event.callbackId)
       else:
         # found and reply
-        sender[].send newSysMessage($GET_NAME_REP, ch.self, %name, event.callbackId)
+        sender[].send newSysMessage($GET_NAME_REP, chp.fastChannel.self, %name, event.callbackId)
     of $GET_NAME_REP:
       let name = event.json.getStr()
       let ch = event.channel
@@ -352,6 +363,23 @@ proc process*(proxy: ThreadProxy): bool =
     else:
       raise newException(Defect, "Unknown system action " & event.action)
   
+proc process*(proxy: ThreadProxy): bool =
+  ## Process one message on channel. Return false if channel is empty, otherwise true.
+  
+  # process fast channel first if tryRecv success
+  block:
+    let (hasData, event) = proxy.fastChannel[].tryRecv()
+    if hasData:
+      proxy.processEvent(event)
+      return true
+
+  # process normal channel
+  block:
+    let (hasData, event) = proxy.channel[].tryRecv()
+    result = hasData
+    if hasData: proxy.processEvent(event)
+
+
 proc stop*(proxy: ThreadProxy) {.inline.} = proxy.active = false
 
 proc poll*(proxy: ThreadProxy, interval: int = 16): Future[void] =
@@ -391,11 +419,16 @@ proc createToken*(proxy: MainThreadProxy, name: string, channelMaxItems: int = 0
 
   # check new channel
   let ch = newThreadChannel(channelMaxItems)
-  proxy.channels[name] = ch
+  let fch = newThreadChannel(0)
+  proxy.channels[name] = ThreadChannelPair(
+    channel: ch,
+    fastChannel: fch
+  )
   return ThreadToken(
     name: name,
-    mainChannel: proxy.channel,
-    channel: ch.self
+    mainFastChannel: proxy.fastChannel,
+    channel: ch.self,
+    fastChannel: fch.self
   )
 
 proc createThread*(proxy: MainThreadProxy, name: string, main: ThreadMainProc, channelMaxItems: int = 0) =
