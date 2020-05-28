@@ -17,6 +17,10 @@ Some key-points:
 - Threads can talk with each other in two-way with `ask(...): Future[JsonNode]`.
 - The order of creation of threads does not matter as long as the target thread is running at the time of calling `send` or `ask`.
 
+Internally:
+
+- After 0.2.0, each thread is associated with two channels. One channel is for internal messages that need to preempt other messages. The other one is for normal messages.
+
 ## Usage 
 
 The typical pattern should look like the following.
