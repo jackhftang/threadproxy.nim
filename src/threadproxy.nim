@@ -44,7 +44,7 @@ type
   SysMsg = enum 
     GET_NAME_REQ, GET_NAME_REP
 
-  ThreadMessage = object
+  ThreadMessage = ref object
     kind: ThreadMessageKind
     action: string
     json: JsonNode
