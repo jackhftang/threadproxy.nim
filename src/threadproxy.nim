@@ -203,11 +203,12 @@ proc on*(proxy: ThreadProxy, action: string, handler: ThreadActionHandler) =
   proxy.actions[action] = handler
 
 proc onDefault*(proxy: ThreadProxy, handler: ThreadDefaultActionHandler) =
-  ## Set default `handler`
+  ## Set default `handler` for all unhandled action
   proxy.defaultAction = handler
 
 template onData*(proxy: ThreadProxy, action: string, body: untyped): void =    
-  ## Template version of `on`
+  ## Template version of `on`, saving you from typing `proc(data: JsonNode): Future[JsonNode] {.gcsafe,async.} = ...` every time. 
+  ## The argument `data` is injected and so the name *onData*.
   proxy.on(
     action, 
     proc(json: JsonNode): Future[JsonNode] {.gcsafe,async.} = 
@@ -222,9 +223,7 @@ template onDefaultData*(proxy: ThreadProxy, body: untyped) =
     let data {.inject.} = j
     `body`
   
-proc send*(proxy: ThreadProxy, target: ThreadChannelPtr, action: string, data: JsonNode): Future[void] =
-  ## Send `data` to `target` channel and then complete.
-  ## Raise MessageUndeliveredError if cannot put on to target channel. 
+proc send(proxy: ThreadProxy, target: ThreadChannelPtr, action: string, data: JsonNode): Future[void] =
   result = newFuture[void]("send")
   let sent = target[].trySend proxy.newMessage(EMIT, action, data) 
   if sent: 
@@ -237,8 +236,7 @@ proc send*(proxy: ThreadProxy, target: ThreadChannelPtr, action: string, data: J
     err.sender = proxy.name
     result.fail(err)
 
-proc ask*(proxy: ThreadProxy, target: ThreadChannelPtr, action: string, data: JsonNode = nil): Future[JsonNode] =
-  ## Send `data` to `target` channel and then wait for reply
+proc ask(proxy: ThreadProxy, target: ThreadChannelPtr, action: string, data: JsonNode = nil): Future[JsonNode] =
   let id = proxy.nextCallbackId() 
   result = newFuture[JsonNode]("ask")
   proxy.jsonCallbacks[id] = result
@@ -284,12 +282,17 @@ proc getChannel*(proxy: ThreadProxy, name: string): Future[ThreadChannelPtr] =
   
 
 proc send*(proxy: ThreadProxy, target: string, action: string, data: JsonNode = nil): Future[void] {.async.} =
-  ## put one message to `target`'s channel
+  ## Send `data` to `target` channel. 
+  ## 
+  ## The returned future complete once the message is successfully placed on target channel.
+  ## otherwise fail with MessageUndeliveredError.
   let ch = await proxy.getChannel(target)
   await proxy.send(ch, action, data)
 
 proc ask*(proxy: ThreadProxy, target: string, action: string, data: JsonNode = nil): Future[JsonNode] {.async.} =
-  ## put one message to target's channel and complete until `target`'s response
+  ## Send `data` to `target` and wait for the return.
+  ## 
+  ## The returned future will complete with the result from target is received. It may fail with many kind of errors.
   let ch = await proxy.getChannel(target)
   result = await proxy.ask(ch, action, data)
 
