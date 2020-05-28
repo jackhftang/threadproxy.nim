@@ -19,7 +19,7 @@ Some key-points:
 
 Internally:
 
-- After 0.2.0, each thread is associated with two channels. One channel is for internal messages that need to preempt other messages. The other one is for normal messages.
+- After 0.2.0, each thread is associated with two channels. One is for internal messages that need to preempt other messages. The other one is for normal messages.
 
 ## Usage 
 
@@ -71,12 +71,12 @@ when isMainModeul:
 ```
 
 1. `import threadproxy` will also `import json, asyncdispatch`. They are almost always used together.
-2. Define an entry function for threads. If you don't want to declare thread on your own, the argument must be a `ThreadProxy`. Also note that the `{.thread.}` pragma must be present.
+2. Define an entry function for threads. The argument have to be a `ThreadProxy` unless you want to create thread manually. Also note that the `{.thread.}` pragma must be present.
 3. Define a handler for `action`. The handler function is responsible for both `send` and `ask` handling. A `nil` return value will be converted to `JNull`
-4. Similar to `on`, but a template version that save you from typing `proc...` everytime. The argument `data` is injected and so the name `onData`
-5. Default handler for all unregistered actions. There is also a templated version `onDefaultData` that work similarly.
-6. Start processing messages on channels asychronously . This must be called exactly once, otherwise nothing will happen.
-7. Create a `MainThreadProxy` with a name.  `MainThreadProxy` is also a `ThreadProxy` with responsibilities to handle threads and channels. 
+4. `onData` is a template version of `on`. It saves you from typing `proc...` everytime. The argument `data` is injected and so the name on**Data**
+5. Default handler for all unregistered actions. There is also a template version `onDefaultData` that work similarly. Only the last *ONE* default hanlder is registered.
+6. Start processing messages on channels asychronously. This must be called exactly once. If poll is not called, nothing will happen. If it is called more than one time during running, a `PollConflictError` will raise.
+7. Create a `MainThreadProxy` with a name.  `MainThreadProxy` is also a `ThreadProxy` but with responsibilities to handle threads and channels. 
 8. Define handlers for MainThreadProxy similar to that in fooMain.
 9. Start processing messages similar to that in fooMain.
 10. Create thread with a name and entry function.
@@ -196,7 +196,7 @@ see **/examples** for more examples
 
 ## Manually Create Thread
 
-If you want to pass more things into the main procedure of threads, you need to generate a token by calling `createToken` in mainThreadProyx and then pass the token to the main procedure and then call `createProxy` in that threads.
+If you want to pass more things into the main procedure of threads, you need to generate a token by calling `createToken` in mainThreadProxy and then pass the token to the main procedure and then call `createProxy` in that threads.
 
 Example
 
