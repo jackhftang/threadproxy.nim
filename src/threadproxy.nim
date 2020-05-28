@@ -7,11 +7,11 @@ type
   ThreadProxyError* = object of CatchableError
 
   ThreadNotFoundError* = object of ThreadProxyError
-    ## Raised when thread with name cannot be found
+    ## Raised when operation on thread with name `threadName` cannot be found
     threadName*: string
 
   ReceiverNotFoundError* = object of ThreadProxyError
-    ## Raised whenever thread with name not found
+    ## Raised whenever sending a message to unknown receiver
     sender*: string
     receiver*: string
 
@@ -23,16 +23,16 @@ type
     data*: JsonNode
 
   ActionConflictError* = object of ThreadProxyError
-    ## Raised when registering action with non-unique name
+    ## Raised when registering action is not unique
     threadName*: string
     action*: string
 
   NameConflictError* = object of ThreadProxyError
-    ## Raise when creating thread with non-unique name
+    ## Raised when name of thread is not unique
     threadName*: string
 
   PollConflictError* = object of ThreadProxyError
-    ## Raise when poll() is called while ThreadProxy is running
+    ## Raised when poll() is called while ThreadProxy is running
     threadName*: string
 
   ThreadMessageKind = enum
@@ -54,7 +54,10 @@ type
   ThreadChannelPtr = ptr Channel[ThreadMessage]
 
   ThreadActionHandler* = proc(data: JsonNode): Future[JsonNode] {.gcsafe.}
+    ## Signature for action handler 
+    
   ThreadDefaultActionHandler* = proc(action: string, data: JsonNode): Future[JsonNode] {.gcsafe.}
+    ## Signature for default action handler 
 
   ThreadProxy* = ref object of RootObj
     active: bool
@@ -65,7 +68,8 @@ type
     callbackSeed: int
     jsonCallbacks: Table[int, Future[JsonNode]]
     channelCallbacks: Table[int, Future[ThreadChannelPtr]]
-    directory: Table[string, ThreadChannelPtr] # local cache 
+    ## local cache to resolve name to channel
+    directory: Table[string, ThreadChannelPtr] 
 
   ThreadChannelWrapper = ref object
     # manually manage memory to prevent GC
@@ -88,6 +92,7 @@ type
     mainFastChannel, fastChannel, channel: ThreadChannelPtr
 
   ThreadMainProc* = proc(proxy: ThreadProxy) {.thread, nimcall.}
+    ## Signature for entry function of thread
 
 proc finalize(ch: ThreadChannelWrapper) =
   ch.self[].close()
@@ -178,9 +183,13 @@ proc newSysMessage(
     callbackId: callbackId
   ) 
 
-proc name*(proxy: ThreadProxy): string {.inline.} = proxy.name
+proc name*(proxy: ThreadProxy): string {.inline.} = 
+  ## Get the name of thread 
+  proxy.name
 
-proc isNameAvailable*(proxy: MainThreadProxy, name: string): bool {.inline.} = name notin proxy.channels
+proc isNameAvailable*(proxy: MainThreadProxy, name: string): bool {.inline.} = 
+  ## Chekc if the name is available to use
+  name notin proxy.channels
 
 proc isMainThreadProxy(proxy: ThreadProxy): bool {.inline.} = proxy.fastChannel == proxy.mainFastChannel
 
@@ -250,7 +259,7 @@ proc ask(proxy: ThreadProxy, target: ThreadChannelPtr, action: string, data: Jso
     err.sender = proxy.name
     result.fail(err)
 
-proc getChannel*(proxy: ThreadProxy, name: string): Future[ThreadChannelPtr] =
+proc getChannel(proxy: ThreadProxy, name: string): Future[ThreadChannelPtr] =
   ## Resolve name to channel
   
   if proxy.isMainThreadProxy:
@@ -383,7 +392,9 @@ proc process*(proxy: ThreadProxy): bool =
     if hasData: proxy.processEvent(event)
 
 
-proc stop*(proxy: ThreadProxy) {.inline.} = proxy.active = false
+proc stop*(proxy: ThreadProxy) {.inline.} = 
+  ## Stop processing messages. The future returned from `poll()` will complete.
+  proxy.active = false
 
 proc poll*(proxy: ThreadProxy, interval: int = 16): Future[void] =
   ## Start processing channel messages.
