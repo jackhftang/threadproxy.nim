@@ -10,24 +10,21 @@ proc workerMain(proxy: ThreadProxy) {.thread.} =
   proxy.onData "resend":
     asyncCheck proxy.send("main", "recev", data)
 
+  proxy.on "failure", proc(j: JsonNode): Future[JsonNode] {.gcsafe,async.} =
+    if true:
+      raise newException(ValueError, j.getStr())
+
   proxy.onDefaultData:
     return %*{
       "action": action,
       "data": data
     }
 
-  asyncCheck proxy.poll()
-
-
-  runForever()
-
-# proc barMain(proxy: ThreadProxy) {.thread.} =
-#   proxy.onData "ping":
-#     echo proxy.name, " receive ", data
-#   asyncCheck proxy.poll()
-
-#   asyncCheck proxy.send("foo", "ping", %"hello world from bar")
-#   runForever()
+  while true:
+    try:
+      waitFor proxy.poll()
+    except:
+      discard
 
 suite "threadproxy":
 
@@ -70,5 +67,31 @@ suite "threadproxy":
       "data": "pong"
     }
 
-    
+  test "failure - send":
+    let run = proc() {.async.} =
+      let proxy = newMainThreadProxy("main")
+      asyncCheck proxy.poll()
+      proxy.createThread("worker1", workerMain)
+      let future = proxy.send("worker1", "failure", %"some error message")
+      yield future
+      assert not future.failed
+    waitFor run()
+
+  test "failure - ask":
+    let run = proc() {.async.} =
+      let proxy = newMainThreadProxy("main")
+      asyncCheck proxy.poll()
+      proxy.createThread("worker1", workerMain)
+      let errMsg = "some error message"
+      let future = proxy.ask("worker1", "failure", %errMsg)
+      yield future
+      assert future.failed
+      let err = future.readError
+      assert err of ResponseError
+      # future inject some unwanted messages
+      # assert err.msg == errMsg
+    waitFor run()
+  
+
+  
     

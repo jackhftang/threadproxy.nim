@@ -13,6 +13,10 @@ type
     ## Raised when operation on thread with name `threadName` cannot be found
     threadName*: string
 
+  ThreadUncleanableError* = object of ThreadProxyError
+    ## Raised when thread cannot be clean-up
+    threadName*: string
+
   ReceiverNotFoundError* = object of ThreadProxyError
     ## Raised whenever sending a message to unknown receiver
     sender*: string
@@ -38,11 +42,20 @@ type
     ## Raised when poll() is called while ThreadProxy is running
     threadName*: string
 
+  HandlerIsNilError* = object of ThreadProxyError
+    ## Raised when handler is nil
+
+  ResponseError* = object of ThreadProxyError
+    ## Raised when the opposite failed to reply
+    action*: string
+    errorMessage*: string
+
   ThreadMessageKind = enum
-    EMIT, REQUEST, REPLY, SYS
+    EMIT, REQUEST, REPLY_SUCCESS, REPLY_FAIL, SYS
 
   SysMsg = enum 
-    GET_NAME_REQ, GET_NAME_REP
+    GET_NAME_REQ, GET_NAME_REP, 
+    DEL_NAME_REQ, DEL_NAME_REP
 
   ThreadMessage = ref object
     kind: ThreadMessageKind
@@ -106,11 +119,6 @@ proc newThreadChannel(channelMaxItems: int): ThreadChannelWrapper =
   result.self = cast[ThreadChannelPtr](allocShared0(sizeof(ThreadChannel)))
   result.self[].open(channelMaxItems)
 
-# proc newThreadChannelPair(channelMaxItems: int): ThreadChannelPair =
-#   result.new()
-#   result.channel = newThreadChannel(channelMaxItems)
-#   result.fastChannel = newThreadChannel(0)
-
 proc finalize(th: ThreadWrapper) =
   dealloc(th.self)
 
@@ -169,8 +177,22 @@ proc newMessage(
     channel: proxy.channel,
     action: action,
     json: if data.isNil: newJNull() else: data,
-    callbackId: callbackId
+    callbackId: callbackId,
   ) 
+
+proc newFailureMessage(
+  proxy: ThreadProxy,
+  action: string,
+  errMsg: string,
+  callbackId: int
+): ThreadMessage =
+  ThreadMessage(
+    kind: REPLY_FAIL,
+    channel: proxy.channel,
+    action: action,
+    json: %errMsg,
+    callbackId: callbackId,
+  )
 
 proc newSysMessage(
   action: string, 
@@ -212,10 +234,14 @@ proc on*(proxy: ThreadProxy, action: string, handler: ThreadActionHandler) =
     err.threadName = proxy.name
     err.action = action 
     raise err
+  if handler.isNil:
+    raise newException(HandlerIsNilError, "Handler cannot be nil")
   proxy.actions[action] = handler
 
 proc onDefault*(proxy: ThreadProxy, handler: ThreadDefaultActionHandler) =
   ## Set default `handler` for all unhandled action
+  if handler.isNil:
+    raise newException(HandlerIsNilError, "Handler cannot be nil")
   proxy.defaultAction = handler
 
 template onData*(proxy: ThreadProxy, action: string, body: untyped): void =    
@@ -321,27 +347,43 @@ proc processEvent(proxy: ThreadProxy, event: ThreadMessage) =
       asyncCheck cb(data)
     elif not proxy.defaultAction.isNil:
       asyncCheck proxy.defaultAction(action, data)
-  of REPLY:
-    let id = event.callbackId
-    let future = proxy.jsonCallbacks.getOrDefault(id, nil)
-    if not future.isNil:
-      proxy.jsonCallbacks.del id
-      future.complete(event.json)
-    # else already called 
   of REQUEST:
     let action = event.action
     let target = event.channel
     let data = event.json
     let id = event.callbackId
-    if action in proxy.actions:
-      let cb = proxy.actions[action]  
-      let future = cb(data)
-      future.addCallback proc(f: Future[JsonNode]) =
-        target[].send proxy.newMessage(REPLY, action, f.read, id) 
-    elif not proxy.defaultAction.isNil:
-      let future = proxy.defaultAction(action, data)
-      future.addCallback proc(f: Future[JsonNode]) =
-        target[].send proxy.newMessage(REPLY, action, f.read, id)
+    let future =
+      if action in proxy.actions:
+        proxy.actions[action](data)
+      else:
+        proxy.defaultAction(action, data)
+    future.addCallback proc(f: Future[JsonNode]) =
+      if unlikely(f.failed):
+        let err = f.readError
+        target[].send proxy.newFailureMessage(err.msg, action, id)
+        # raise in local thread, same behavior as asyncCheck in send
+        raise err
+      else:
+        target[].send proxy.newMessage(REPLY_SUCCESS, action, f.read, id)
+  of REPLY_SUCCESS:
+    let id = event.callbackId
+    let future = proxy.jsonCallbacks.getOrDefault(id, nil)
+    if likely(not future.isNil):
+      proxy.jsonCallbacks.del id
+      future.complete(event.json)
+    # else already called 
+  of REPLY_FAIL:
+    let id = event.callbackId
+    let action = event.action
+    let errMsg = event.json.getStr()
+    let future = proxy.jsonCallbacks.getOrDefault(id, nil)
+    if likely(not future.isNil):
+      proxy.jsonCallbacks.del id
+      let err = newException(ResponseError, "Failure response")
+      err.action = action
+      err.errorMessage = errMsg
+      # todo: the error message is strange...
+      future.fail(err)
   of SYS:
     case event.action
     of $GET_NAME_REQ:
@@ -375,6 +417,14 @@ proc processEvent(proxy: ThreadProxy, event: ThreadMessage) =
         if not cb.isNil: 
           proxy.channelCallbacks.del id
           cb.complete(ch)
+    of $DEL_NAME_REQ:
+      let name = event.json.getStr()
+      let sender = event.channel
+      let id = event.callbackId
+      proxy.directory.del name
+      sender[].send newSysMessage($DEL_NAME_REP, nil, nil, id)
+    # of $DEL_NAME_REP:
+
     else:
       raise newException(Defect, "Unknown system action " & event.action)
   
@@ -479,3 +529,22 @@ proc isThreadRunning*(proxy: MainThreadProxy, name: string): bool =
     raise err
   let thread = proxy.threads[name]
   result = running(thread.self[])
+
+proc cleanThread*(proxy: MainThreadProxy, name: string): Future[void] =
+  ## Unreference reousrces associated with a non-running thread of `name`. 
+  ## The resources will be released upon GC. 
+  ## 
+  ## Call GC_fullCollect() right after cleanupThread() if you want to release the resource immediately.
+  ## 
+  ## Raise ThreadUncleanableError if the thread is running
+  ## 
+  if proxy.isThreadRunning(name):
+    var err = newException(ThreadUncleanableError, "Cannot clean up a running thread")
+    err.threadName = name
+    raise err
+
+  # todo ask all threads to remove cache of name 
+  # 
+  proxy.threads.del(name)
+  proxy.channels.del(name)
+  # GC_fullCollect()
