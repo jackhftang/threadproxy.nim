@@ -3,12 +3,22 @@ import threadproxy
 import json
 
 proc workerMain(proxy: ThreadProxy) {.thread.} =
+  var active = true
 
   proxy.onData "ping":
     return data
 
+  proxy.onData "pingTo":
+    let future = proxy.ask(data.getStr(), "ping", %proxy.name)
+    yield future
+    return %( not future.failed )
+
   proxy.onData "resend":
     asyncCheck proxy.send("main", "recev", data)
+
+  proxy.onData "stop":
+    active = false
+    proxy.stop()
 
   proxy.on "failure", proc(j: JsonNode): Future[JsonNode] {.gcsafe,async.} =
     if true:
@@ -20,7 +30,7 @@ proc workerMain(proxy: ThreadProxy) {.thread.} =
       "data": data
     }
 
-  while true:
+  while active:
     try:
       waitFor proxy.poll()
     except:
@@ -92,6 +102,30 @@ suite "threadproxy":
       # assert err.msg == errMsg
     waitFor run()
   
+  test "cleanThreads":
+    let run = proc() {.async.} =
+      let proxy = newMainThreadProxy("main")
+      asyncCheck proxy.poll()
+      proxy.createThread("worker1", workerMain)
+      proxy.createThread("worker2", workerMain)
+      proxy.createThread("worker3", workerMain)
 
-  
-    
+      block:
+        # worker2 pre-cache worker1 channel, while worker3 not
+        let canPing21 = await proxy.ask("worker2", "pingTo", %"worker1")
+        assert canPing21.getBool()
+
+      await proxy.send("worker1", "stop")
+      while proxy.isThreadRunning("worker1"):
+        discard
+      await proxy.cleanThreads()
+
+      block:
+        let canPing21 = await proxy.ask("worker2", "pingTo", %"worker1")
+        assert not canPing21.getBool()
+        let canPing31 = await proxy.ask("worker3", "pingTo", %"worker1")
+        assert not canPing31.getBool()
+
+    waitFor run()
+
+
