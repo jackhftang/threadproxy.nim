@@ -105,6 +105,9 @@ function main() {
   <li><a class="reference" href="#ThreadNotFoundError"
     title="ThreadNotFoundError = object of ThreadProxyError
   threadName*: string"><wbr />Thread<wbr />Not<wbr />Found<wbr />Error<span class="attachedType"></span></a></li>
+  <li><a class="reference" href="#ThreadUncleanableError"
+    title="ThreadUncleanableError = object of ThreadProxyError
+  threadName*: string"><wbr />Thread<wbr />Uncleanable<wbr />Error<span class="attachedType"></span></a></li>
   <li><a class="reference" href="#ReceiverNotFoundError"
     title="ReceiverNotFoundError = object of ThreadProxyError
   sender*: string
@@ -125,6 +128,12 @@ function main() {
   <li><a class="reference" href="#PollConflictError"
     title="PollConflictError = object of ThreadProxyError
   threadName*: string"><wbr />Poll<wbr />Conflict<wbr />Error<span class="attachedType"></span></a></li>
+  <li><a class="reference" href="#HandlerIsNilError"
+    title="HandlerIsNilError = object of ThreadProxyError"><wbr />Handler<wbr />Is<wbr />Nil<wbr />Error<span class="attachedType"></span></a></li>
+  <li><a class="reference" href="#ResponseError"
+    title="ResponseError = object of ThreadProxyError
+  action*: string
+  errorMessage*: string"><wbr />Response<wbr />Error<span class="attachedType"></span></a></li>
   <li><a class="reference" href="#ThreadActionHandler"
     title="ThreadActionHandler = proc (data: JsonNode): Future[JsonNode] {.gcsafe.}"><wbr />Thread<wbr />Action<wbr />Handler<span class="attachedType"></span></a></li>
   <li><a class="reference" href="#ThreadDefaultActionHandler"
@@ -192,6 +201,8 @@ function main() {
     title="pinToCpu(proxy: MainThreadProxy; name: string; cpu: Natural)"><wbr />pin<wbr />To<wbr />Cpu<span class="attachedType">MainThreadProxy</span></a></li>
   <li><a class="reference" href="#isThreadRunning%2CMainThreadProxy%2Cstring"
     title="isThreadRunning(proxy: MainThreadProxy; name: string): bool"><wbr />is<wbr />Thread<wbr />Running<span class="attachedType">MainThreadProxy</span></a></li>
+  <li><a class="reference" href="#cleanThreads%2CMainThreadProxy"
+    title="cleanThreads(proxy: MainThreadProxy): Future[void]"><wbr />clean<wbr />Threads<span class="attachedType">MainThreadProxy</span></a></li>
 
   </ul>
 </li>
@@ -230,6 +241,15 @@ function main() {
 <dd>
 
 Raised when operation on thread with name <tt class="docutils literal"><span class="pre">threadName</span></tt> cannot be found
+
+</dd>
+<a id="ThreadUncleanableError"></a>
+<dt><pre><a href="threadproxy.html#ThreadUncleanableError"><span class="Identifier">ThreadUncleanableError</span></a> <span class="Other">=</span> <span class="Keyword">object</span> <span class="Keyword">of</span> <a href="threadproxy.html#ThreadProxyError"><span class="Identifier">ThreadProxyError</span></a>
+  <span class="Identifier">threadName</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
+</pre></dt>
+<dd>
+
+Raised when thread cannot be clean-up
 
 </dd>
 <a id="ReceiverNotFoundError"></a>
@@ -280,6 +300,24 @@ Raised when name of thread is not unique
 <dd>
 
 Raised when poll() is called while ThreadProxy is running
+
+</dd>
+<a id="HandlerIsNilError"></a>
+<dt><pre><a href="threadproxy.html#HandlerIsNilError"><span class="Identifier">HandlerIsNilError</span></a> <span class="Other">=</span> <span class="Keyword">object</span> <span class="Keyword">of</span> <a href="threadproxy.html#ThreadProxyError"><span class="Identifier">ThreadProxyError</span></a>
+  </pre></dt>
+<dd>
+
+Raised when handler is nil
+
+</dd>
+<a id="ResponseError"></a>
+<dt><pre><a href="threadproxy.html#ResponseError"><span class="Identifier">ResponseError</span></a> <span class="Other">=</span> <span class="Keyword">object</span> <span class="Keyword">of</span> <a href="threadproxy.html#ThreadProxyError"><span class="Identifier">ThreadProxyError</span></a>
+  <span class="Identifier">action</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
+  <span class="Identifier">errorMessage</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
+</pre></dt>
+<dd>
+
+Raised when the opposite failed to reply
 
 </dd>
 <a id="ThreadActionHandler"></a>
@@ -385,15 +423,15 @@ Check if <tt class="docutils literal"><span class="pre">proxy</span></tt> is run
 </dd>
 <a id="on,ThreadProxy,string,ThreadActionHandler"></a>
 <dt><pre><span class="Keyword">proc</span> <a href="#on%2CThreadProxy%2Cstring%2CThreadActionHandler"><span class="Identifier">on</span></a><span class="Other">(</span><span class="Identifier">proxy</span><span class="Other">:</span> <a href="threadproxy.html#ThreadProxy"><span class="Identifier">ThreadProxy</span></a><span class="Other">;</span> <span class="Identifier">action</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">handler</span><span class="Other">:</span> <a href="threadproxy.html#ThreadActionHandler"><span class="Identifier">ThreadActionHandler</span></a><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma">
-    <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ActionConflictError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+    <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ActionConflictError</span><span class="Other">,</span> <span class="Identifier">HandlerIsNilError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
 Set <tt class="docutils literal"><span class="pre">handler</span></tt> for <tt class="docutils literal"><span class="pre">action</span></tt>
 
 </dd>
 <a id="onDefault,ThreadProxy,ThreadDefaultActionHandler"></a>
-<dt><pre><span class="Keyword">proc</span> <a href="#onDefault%2CThreadProxy%2CThreadDefaultActionHandler"><span class="Identifier">onDefault</span></a><span class="Other">(</span><span class="Identifier">proxy</span><span class="Other">:</span> <a href="threadproxy.html#ThreadProxy"><span class="Identifier">ThreadProxy</span></a><span class="Other">;</span> <span class="Identifier">handler</span><span class="Other">:</span> <a href="threadproxy.html#ThreadDefaultActionHandler"><span class="Identifier">ThreadDefaultActionHandler</span></a><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
-    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+<dt><pre><span class="Keyword">proc</span> <a href="#onDefault%2CThreadProxy%2CThreadDefaultActionHandler"><span class="Identifier">onDefault</span></a><span class="Other">(</span><span class="Identifier">proxy</span><span class="Other">:</span> <a href="threadproxy.html#ThreadProxy"><span class="Identifier">ThreadProxy</span></a><span class="Other">;</span> <span class="Identifier">handler</span><span class="Other">:</span> <a href="threadproxy.html#ThreadDefaultActionHandler"><span class="Identifier">ThreadDefaultActionHandler</span></a><span class="Other">)</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma">
+    <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">HandlerIsNilError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
 Set default <tt class="docutils literal"><span class="pre">handler</span></tt> for all unhandled action
@@ -420,8 +458,8 @@ Set default <tt class="docutils literal"><span class="pre">handler</span></tt> f
 
 </dd>
 <a id="process,ThreadProxy"></a>
-<dt><pre><span class="Keyword">proc</span> <a href="#process%2CThreadProxy"><span class="Identifier">process</span></a><span class="Other">(</span><span class="Identifier">proxy</span><span class="Other">:</span> <a href="threadproxy.html#ThreadProxy"><span class="Identifier">ThreadProxy</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span>
-    <span class="Identifier">FutureError</span><span class="Other">,</span> <span class="Identifier">DeadThreadError</span><span class="Other">,</span> <span class="Identifier">Defect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+<dt><pre><span class="Keyword">proc</span> <a href="#process%2CThreadProxy"><span class="Identifier">process</span></a><span class="Other">(</span><span class="Identifier">proxy</span><span class="Other">:</span> <a href="threadproxy.html#ThreadProxy"><span class="Identifier">ThreadProxy</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">gcsafe</span><span class="Other">,</span> <span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span>
+    <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">DeadThreadError</span><span class="Other">,</span> <span class="Identifier">FutureError</span><span class="Other">,</span> <span class="Identifier">Defect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
 <dd>
 
 Process one message on channel. Return false if channel is empty, otherwise true.
@@ -477,6 +515,15 @@ Pin thread <tt class="docutils literal"><span class="pre">name</span></tt> to cp
 Check whether thread is running. Applicable only to threads created with <tt class="docutils literal"><span class="pre">createThread</span></tt>
 
 </dd>
+<a id="cleanThreads,MainThreadProxy"></a>
+<dt><pre><span class="Keyword">proc</span> <a href="#cleanThreads%2CMainThreadProxy"><span class="Identifier">cleanThreads</span></a><span class="Other">(</span><span class="Identifier">proxy</span><span class="Other">:</span> <a href="threadproxy.html#MainThreadProxy"><span class="Identifier">MainThreadProxy</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">Future</span><span class="Other">[</span><span class="Identifier">void</span><span class="Other">]</span> <span><span class="Other">{</span><span class="Other pragmadots">...</span><span class="Other">}</span></span><span class="pragmawrap"><span class="Other">{.</span><span class="pragma"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span>
+    <span class="Identifier">ThreadNotFoundError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">FutureError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span>
+    <span class="Identifier">DeadThreadError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span></span><span class="Other">.}</span></span></pre></dt>
+<dd>
+
+Clean up resource of non-running threads
+
+</dd>
 
 </dl></div>
 <div class="section" id="18">
@@ -506,7 +553,7 @@ Template version of <tt class="docutils literal"><span class="pre">onDefault</sp
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br/>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2020-05-28 18:57:02 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2020-05-29 19:55:51 UTC</small>
       </div>
     </div>
   </div>
