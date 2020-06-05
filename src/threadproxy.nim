@@ -302,7 +302,7 @@ proc getChannel(proxy: ThreadProxy, name: string): Future[ThreadChannelPtr] =
       result = newFuture[ThreadChannelPtr]("getChannel")
       result.complete(ch)
     else:
-      var err = newException(ReceiverNotFoundError, "Cannot not find " & name)
+      var err = newException(ReceiverNotFoundError, "Cannot find " & name)
       err.sender = proxy.name
       err.receiver = name
       result = newFuture[ThreadChannelPtr]("getChannel")
