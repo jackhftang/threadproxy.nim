@@ -228,6 +228,8 @@ proc main() =
   # create thread token
   let token = proxy.createToken("worker_0")
 
+  # NOTE: You are responsible to make sure that
+  # the variable workerThread live longer than the thread itself
   var workerThread: Thread[WorkerThreadArgs]
   createThread(workerThread, workerMain, WorkerThreadArgs(
     multiplier: 3,
