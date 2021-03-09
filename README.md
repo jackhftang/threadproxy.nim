@@ -198,7 +198,7 @@ see [/examples](/examples) for more examples.
 
 ## Manually Create Thread
 
-If you want to pass more things into the main procedure of threads, you need to generate a token by calling `createToken` in mainThreadProxy and then pass the token to the main procedure and then call `createProxy` in that threads.
+If you want to pass more things into the main procedure of threads, you need to generate a token by calling `createToken` in mainThreadProxy and then pass the token to the main procedure and then call `newThreadProxy` in that threads.
 
 Example
 
